@@ -440,7 +440,7 @@ export default function Dashboard() {
                         {SLOTS.map(slot => (
                           <tr key={slot}>
                             <td style={{ padding: '2px 6px', fontSize: 11, fontWeight: 600 }}>{slot}</td>
-                            {[1, 2, 3, 4, 5].map(day => {
+                            {[1, 2, 3, 4, 5, 6, 7].map(day => {
                               const items = getAssignments(list, day, slot)
                               return (
                                 <td key={day} style={{ padding: '2px 4px' }}>
