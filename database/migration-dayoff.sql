@@ -29,7 +29,15 @@ ALTER TABLE course_schedules ADD COLUMN IF NOT EXISTS sun_34 BOOLEAN DEFAULT fal
 ALTER TABLE course_schedules ADD COLUMN IF NOT EXISTS sun_67 BOOLEAN DEFAULT false;
 ALTER TABLE course_schedules ADD COLUMN IF NOT EXISTS sun_89 BOOLEAN DEFAULT false;
 
--- 4. slot_config 添加周六日默认配置（0人）
+-- 4. 修复 slot_config 的 day_of_week 约束（允许6、7）
+ALTER TABLE slot_config DROP CONSTRAINT IF EXISTS slot_config_day_of_week_check;
+ALTER TABLE slot_config ADD CONSTRAINT slot_config_day_of_week_check CHECK (day_of_week BETWEEN 1 AND 7);
+
+-- 5. 修复 assignments 的 day_of_week 约束（允许6、7）
+ALTER TABLE assignments DROP CONSTRAINT IF EXISTS assignments_day_of_week_check;
+ALTER TABLE assignments ADD CONSTRAINT assignments_day_of_week_check CHECK (day_of_week BETWEEN 1 AND 7);
+
+-- 6. slot_config 添加周六日默认配置（0人）
 INSERT INTO slot_config (day_of_week, slot, required_count) VALUES
   (6, '上午', 0), (6, '下午1', 0), (6, '下午2', 0),
   (7, '上午', 0), (7, '下午1', 0), (7, '下午2', 0)

@@ -61,7 +61,7 @@ ALTER TABLE semester_config ADD COLUMN IF NOT EXISTS current_week INTEGER DEFAUL
 -- 4. 每时段人数配置
 CREATE TABLE IF NOT EXISTS slot_config (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  day_of_week     INTEGER NOT NULL CHECK (day_of_week BETWEEN 1 AND 5),
+  day_of_week     INTEGER NOT NULL CHECK (day_of_week BETWEEN 1 AND 7),
   slot            TEXT NOT NULL CHECK (slot IN ('上午', '下午1', '下午2')),
   required_count  INTEGER DEFAULT 1,
   UNIQUE(day_of_week, slot)
@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS slot_config (
 CREATE TABLE IF NOT EXISTS assignments (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   week_number       INTEGER NOT NULL,
-  day_of_week       INTEGER NOT NULL CHECK (day_of_week BETWEEN 1 AND 5),
+  day_of_week       INTEGER NOT NULL CHECK (day_of_week BETWEEN 1 AND 7),
   slot              TEXT NOT NULL CHECK (slot IN ('上午', '下午1', '下午2')),
   member_id         UUID REFERENCES members(id) ON DELETE CASCADE,
   is_emergency      BOOLEAN DEFAULT false,
