@@ -164,14 +164,13 @@ export default function Stats() {
                 <tr>
                   <th>姓名</th>
                   <th>角色</th>
-                  <th>实际值班(h)</th>
+                  <th>值班时长(h)</th>
                   <th>请假次数</th>
-                  <th>合计有效时长(h)</th>
                 </tr>
               </thead>
               <tbody>
                 {stats.length === 0 ? (
-                  <tr><td colSpan={5} style={{ padding: 40, color: '#999' }}>暂无统计数据</td></tr>
+                  <tr><td colSpan={4} style={{ padding: 40, color: '#999' }}>暂无统计数据</td></tr>
                 ) : stats.map(s => (
                   <tr key={s.id}>
                     <td><strong>{s.name}</strong></td>
@@ -180,7 +179,6 @@ export default function Stats() {
                     <td style={{ color: s.leaveCount > 0 ? '#E65100' : '#999' }}>
                       {s.leaveCount > 0 ? `${s.leaveCount}次（不计时长）` : '-'}
                     </td>
-                    <td><strong>{s.totalHours.toFixed(1)}</strong></td>
                   </tr>
                 ))}
               </tbody>

@@ -30,7 +30,7 @@ export default function Scheduling() {
   async function loadAll() {
     const { data: sem } = await supabase.from('semester_config').select('*').limit(1).single()
     setSemesterConfig(sem)
-    if (sem?.current_week && !weekNumber) {
+    if (sem?.current_week) {
       setWeekNumber(sem.current_week)
     }
     await loadSlotConfig()
@@ -124,7 +124,7 @@ export default function Scheduling() {
         lastWeek: lastWeek || [], allAssignments: allAssignments || [],
         makeUpMembers: makeUpMembers || [],
         otherWeekSchedules: otherWeekSchedules || [],
-        dayConfig
+        dayConfig, weekType
       })
 
       await supabase.from('assignments').delete().eq('week_number', weekNumber)
@@ -160,7 +160,7 @@ export default function Scheduling() {
     const weekType = isOddWeek(weekNumber) ? '单周' : '双周'
     const { data: schedules } = await supabase.from('course_schedules').select('*').eq('week_type', weekType)
     const { data: members } = await supabase.from('members').select('*').eq('active', true)
-    const dKey = resolveScheduleKey(assignment.day_of_week, dayConfig)
+    const dKey = resolveScheduleKey(assignment.day_of_week, dayConfig, weekType)
     const sKey = SLOT_KEYS[SLOTS.indexOf(assignment.slot)]
     const colKey = `${dKey}_${sKey}`
 
@@ -175,7 +175,16 @@ export default function Scheduling() {
     })
 
     const roleWeight = { '部员': 0, '部长': 1, '主席团': 2 }
-    available.sort((a, b) => (roleWeight[a.role] || 0) - (roleWeight[b.role] || 0))
+    available.sort((a, b) => {
+      // 完全没课表的同学排最前面
+      const aNoSchedule = scheduleMap[a.id] ? 1 : 0
+      const bNoSchedule = scheduleMap[b.id] ? 1 : 0
+      if (aNoSchedule !== bNoSchedule) return aNoSchedule - bNoSchedule
+      return (roleWeight[a.role] || 0) - (roleWeight[b.role] || 0)
+    })
+
+    // 标记哪些同学完全没课表（优先标记）
+    available.forEach(c => { c._noSchedule = !scheduleMap[c.id] })
 
     setCandidates(available)
     setShowReplace(assignment)
@@ -411,21 +420,39 @@ export default function Scheduling() {
             <div className="table-wrapper">
               <table>
                 <thead>
-                  <tr><th>姓名</th><th>角色</th><th>操作</th></tr>
+                  <tr><th>姓名</th><th>角色</th><th>课表</th><th>操作</th></tr>
                 </thead>
                 <tbody>
                   {candidates.length === 0 ? (
-                    <tr><td colSpan={3} style={{ padding: 20, color: '#999' }}>暂无可替换的候选人</td></tr>
-                  ) : candidates.slice(0, 20).map(c => (
-                    <tr key={c.id}>
-                      <td><strong>{c.name}</strong></td>
+                    <tr><td colSpan={4} style={{ padding: 20, color: '#999' }}>暂无可替换的候选人</td></tr>
+                  ) : candidates.slice(0, 20).map(c => {
+                    const noScheduleAtAll = c._noSchedule
+                    return (
+                    <tr key={c.id} style={noScheduleAtAll ? { background: '#f1f8e9' } : {}}>
+                      <td>
+                        <strong>{c.name}</strong>
+                        {noScheduleAtAll && (
+                          <span style={{
+                            marginLeft: 6, fontSize: 10, color: '#2E7D32',
+                            background: '#C8E6C9', padding: '1px 5px', borderRadius: 3,
+                            fontWeight: 600
+                          }}>空课表</span>
+                        )}
+                      </td>
                       <td><span className={`badge ${c.role === '部员' ? 'badge-red' : c.role === '部长' ? 'badge-gold' : 'badge-green'}`}>{c.role}</span></td>
+                      <td>
+                        {noScheduleAtAll ? (
+                          <span style={{ fontSize: 12, color: '#2E7D32', fontWeight: 600 }}>✅ 优先</span>
+                        ) : (
+                          <span style={{ fontSize: 12, color: '#666' }}>该时段空闲</span>
+                        )}
+                      </td>
                       <td>
                         <button className="btn btn-small btn-primary"
                           onClick={() => handleReplace(c.id)}>选为替补</button>
                       </td>
                     </tr>
-                  ))}
+                  )})}
                 </tbody>
               </table>
             </div>

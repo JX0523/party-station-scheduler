@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
 import './Navbar.css'
@@ -15,6 +16,15 @@ const NAV_ITEMS = [
 export default function Navbar() {
   const navigate = useNavigate()
   const location = useLocation()
+  const [userEmail, setUserEmail] = useState('')
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user?.email) {
+        setUserEmail(session.user.email)
+      }
+    })
+  }, [])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -42,9 +52,11 @@ export default function Navbar() {
         </div>
 
         <div className="navbar-actions">
-          <span className="navbar-user">
-            {supabase.auth.getSession().then ? '' : ''}
-          </span>
+          {userEmail && (
+            <span className="navbar-user" title={userEmail}>
+              {userEmail}
+            </span>
+          )}
           <button className="btn btn-small btn-secondary" onClick={handleLogout}>
             退出登录
           </button>

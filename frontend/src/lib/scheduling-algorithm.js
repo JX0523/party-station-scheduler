@@ -33,12 +33,13 @@ for (const d of ALL_DAY_KEYS) {
  * @param {Array}   params.makeUpMembers      - 需要补排的人 [{member_id}, ...]
  * @param {Array}   params.otherWeekSchedules - 另一周类型（单/双周）的课表
  * @param {Object}  params.dayConfig          - { 1:true, 2:true, ... 7:false } 工作日配置
+ * @param {string}  params.weekType           - '单周' | '双周'
  * @returns {{ assignments: Array, meta: Object }}
  */
 export function runSchedulingAlgorithm({
   members, schedules, slotConfig, weekNumber,
   lastWeek, allAssignments, makeUpMembers,
-  otherWeekSchedules, dayConfig
+  otherWeekSchedules, dayConfig, weekType
 }) {
   const lastWeekIds = new Set((lastWeek || []).map(a => a.member_id))
   const makeUpIds = new Set((makeUpMembers || []).map(a => a.member_id))
@@ -52,8 +53,12 @@ export function runSchedulingAlgorithm({
       if (typeof v === 'object' && v !== null) {
         if (v.isWorkday) {
           workdays.push(d)
-          if (v.substituteFor && v.substituteFor >= 1 && v.substituteFor <= 5) {
-            daySubstitutions[d] = v.substituteFor
+          // 按周类型选择调休映射：单周用 substituteForOdd，双周用 substituteForEven，fallback 到 substituteFor
+          const sub = weekType === '单周'
+            ? (v.substituteForOdd || v.substituteFor)
+            : (v.substituteForEven || v.substituteFor)
+          if (sub && sub >= 1 && sub <= 5) {
+            daySubstitutions[d] = sub
           }
         }
       } else if (v) {
@@ -314,17 +319,21 @@ export function runSchedulingAlgorithm({
 
 /**
  * 根据 dayConfig 解析某天实际使用的课表 key
- * 调休场景：周六补周一的课 → resolveScheduleKey(6, dayConfig) → 'mon'
+ * 调休场景：周六补周一的课 → resolveScheduleKey(6, dayConfig, '单周') → 'mon'
  * @param {number} dayOfWeek 1-7
  * @param {Object|null} dayConfig
+ * @param {string} [weekType] '单周' | '双周'，用于选择单/双周的调休映射
  * @returns {string} 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun'
  */
-export function resolveScheduleKey(dayOfWeek, dayConfig) {
+export function resolveScheduleKey(dayOfWeek, dayConfig, weekType) {
   if (!dayConfig) return ALL_DAY_KEYS[dayOfWeek - 1]
   const v = dayConfig[dayOfWeek]
-  if (typeof v === 'object' && v !== null && v.substituteFor) {
-    const sub = v.substituteFor
-    if (sub >= 1 && sub <= 5) return ALL_DAY_KEYS[sub - 1]
+  if (typeof v === 'object' && v !== null) {
+    // 按周类型选择：单周用 substituteForOdd，双周用 substituteForEven，fallback 到 substituteFor
+    const sub = weekType === '单周'
+      ? (v.substituteForOdd || v.substituteFor)
+      : (v.substituteForEven || v.substituteFor)
+    if (sub && sub >= 1 && sub <= 5) return ALL_DAY_KEYS[sub - 1]
   }
   return ALL_DAY_KEYS[dayOfWeek - 1]
 }

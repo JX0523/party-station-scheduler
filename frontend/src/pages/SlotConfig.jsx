@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase.js'
 
-const DAYS = ['周一', '周二', '周三', '周四', '周五']
+const DAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+const DAY_NUMBERS = [1, 2, 3, 4, 5, 6, 7]
 const SLOTS = ['上午', '下午1', '下午2']
 
 export default function SlotConfig() {
@@ -17,10 +18,11 @@ export default function SlotConfig() {
     if (data) {
       data.forEach(d => { map[`${d.day_of_week}_${d.slot}`] = { id: d.id, count: d.required_count } })
     }
-    // 默认值
-    for (let d = 1; d <= 5; d++) {
+    // 默认值：周一至周五每时段1人，周六日0人
+    for (let d = 1; d <= 7; d++) {
+      const defaultCount = d <= 5 ? 1 : 0
       SLOTS.forEach(s => {
-        if (!map[`${d}_${s}`]) map[`${d}_${s}`] = { id: null, count: 1 }
+        if (!map[`${d}_${s}`]) map[`${d}_${s}`] = { id: null, count: defaultCount }
       })
     }
     setConfig(map)
@@ -34,7 +36,7 @@ export default function SlotConfig() {
   async function handleSave() {
     setSaving(true)
     const upserts = []
-    for (let d = 1; d <= 5; d++) {
+    for (let d = 1; d <= 7; d++) {
       SLOTS.forEach(s => {
         const key = `${d}_${s}`
         upserts.push({
@@ -69,6 +71,7 @@ export default function SlotConfig() {
 
       <p style={{ fontSize: 14, color: '#999', marginBottom: 16 }}>
         设置每天每个时段需要安排几名同学值班。设为0表示该时段不需要值班。
+        周六日默认不需要值班（0人），调休时可调整。
       </p>
 
       <div className="card">
@@ -77,25 +80,36 @@ export default function SlotConfig() {
             <thead>
               <tr>
                 <th>时段</th>
-                {DAYS.map(d => <th key={d}>{d}</th>)}
+                {DAYS.map((d, i) => (
+                  <th key={d} style={i >= 5 ? { background: '#FFF8E1', color: '#8B6914' } : {}}>
+                    {d}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {SLOTS.map(s => (
                 <tr key={s}>
                   <td style={{ fontWeight: 600 }}>{s}</td>
-                  {[1, 2, 3, 4, 5].map(d => (
-                    <td key={d}>
-                      <input
-                        type="number"
-                        className="form-input"
-                        style={{ width: 80, textAlign: 'center', margin: '0 auto' }}
-                        min="0" max="10"
-                        value={config[`${d}_${s}`]?.count ?? 1}
-                        onChange={e => setCount(d, s, e.target.value)}
-                      />
-                    </td>
-                  ))}
+                  {DAY_NUMBERS.map(d => {
+                    const key = `${d}_${s}`
+                    const isWeekend = d >= 6
+                    return (
+                      <td key={d}>
+                        <input
+                          type="number"
+                          className="form-input"
+                          style={{
+                            width: 80, textAlign: 'center', margin: '0 auto',
+                            background: isWeekend ? '#FFFDF5' : undefined
+                          }}
+                          min="0" max="10"
+                          value={config[key]?.count ?? (isWeekend ? 0 : 1)}
+                          onChange={e => setCount(d, s, e.target.value)}
+                        />
+                      </td>
+                    )
+                  })}
                 </tr>
               ))}
             </tbody>

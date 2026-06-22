@@ -58,10 +58,11 @@
 │   ├── schema.sql            # 建表SQL（含RLS、默认数据）
 │   ├── migration-dayoff.sql  # 调休功能迁移v1
 │   └── migration-dayoff-v2.sql # 调休课表映射迁移v2
-├── test-algorithm.mjs        # 算法单元测试（27项）
-├── test-phase1-fix.mjs       # 课表冲突+调休测试（32项）
-├── test-comprehensive.mjs    # 综合场景测试（49项）
-└── test-full-semester.mjs    # 全学期模拟测试（14项）
+├── test-algorithm.mjs           # 算法单元测试（27项）
+├── test-phase1-fix.mjs          # 课表冲突+调休测试（32项）
+├── test-comprehensive.mjs       # 综合场景测试（49项）
+├── test-full-semester.mjs       # 全学期模拟测试（14项）
+└── test-basic-functionality.mjs # 基础功能测试（59项）
 ```
 
 ## 快速命令

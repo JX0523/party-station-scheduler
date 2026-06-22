@@ -4,7 +4,7 @@ import App from './App.jsx'
 import './styles/global.css'
 
 createRoot(document.getElementById('root')).render(
-  <BrowserRouter basename="/party-station-scheduler">
+  <BrowserRouter basename={import.meta.env.PROD ? '/party-station-scheduler' : '/'}>
     <App />
   </BrowserRouter>,
 )
