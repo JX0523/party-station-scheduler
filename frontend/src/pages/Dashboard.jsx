@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
 import { runSchedulingAlgorithm } from '../lib/scheduling-algorithm.js'
+import DaySelector from '../components/DaySelector.jsx'
 
-const DAYS = ['周一', '周二', '周三', '周四', '周五']
-const DAYS_SHORT = ['一', '二', '三', '四', '五']
+const ALL_DAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+const ALL_DAYS_SHORT = ['一', '二', '三', '四', '五', '六', '日']
 const SLOTS = ['上午', '下午1', '下午2']
-const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri']
+const ALL_DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
 const SLOT_KEYS = ['34', '67', '89']
 
 export default function Dashboard() {
@@ -21,6 +22,7 @@ export default function Dashboard() {
   const [showAdd, setShowAdd] = useState(null)
   const [candidates, setCandidates] = useState([])
   const [addMode, setAddMode] = useState(null)
+  const [dayConfig, setDayConfig] = useState(null)
 
   useEffect(() => { loadAll() }, [])
 
@@ -91,7 +93,8 @@ export default function Dashboard() {
       slotConfig: scMap, weekNumber: cw,
       lastWeek: lastWeek || [], allAssignments: allAssignments || [],
       makeUpMembers: makeUpMembers || [],
-      otherWeekSchedules: otherWeekSchedules || []
+      otherWeekSchedules: otherWeekSchedules || [],
+      dayConfig
     })
 
     if (result.assignments.length > 0) {
@@ -125,7 +128,7 @@ export default function Dashboard() {
     const weekType = ((config?.first_week_is_odd ? cw % 2 === 1 : cw % 2 === 0)) ? '单周' : '双周'
     const { data: schedules } = await supabase.from('course_schedules').select('*').eq('week_type', weekType)
     const { data: members } = await supabase.from('members').select('*').eq('active', true)
-    const dKey = DAY_KEYS[assignment.day_of_week - 1]
+    const dKey = ALL_DAY_KEYS[assignment.day_of_week - 1]
     const sKey = SLOT_KEYS[SLOTS.indexOf(assignment.slot)]
     const colKey = `${dKey}_${sKey}`
 
@@ -153,7 +156,7 @@ export default function Dashboard() {
     const weekType = ((config?.first_week_is_odd ? cw % 2 === 1 : cw % 2 === 0)) ? '单周' : '双周'
     const { data: schedules } = await supabase.from('course_schedules').select('*').eq('week_type', weekType)
     const { data: members } = await supabase.from('members').select('*').eq('active', true)
-    const dKey = DAY_KEYS[day - 1]
+    const dKey = ALL_DAY_KEYS[day - 1]
     const sKey = SLOT_KEYS[SLOTS.indexOf(slot)]
     const colKey = `${dKey}_${sKey}`
 
@@ -236,6 +239,13 @@ export default function Dashboard() {
     setTimeout(() => setToast(null), 3000)
   }
 
+  // 获取本周工作日列表
+  function getWorkdays() {
+    if (!dayConfig) return [1, 2, 3, 4, 5]
+    return [1, 2, 3, 4, 5, 6, 7].filter(d => dayConfig[d])
+  }
+  const workdayList = getWorkdays()
+
   const today = new Date().getDay()
   const cw = config?.current_week || 1
 
@@ -292,6 +302,11 @@ export default function Dashboard() {
         <button className="btn btn-secondary" onClick={() => navigate('/stats')}>📊 统计导出</button>
       </div>
 
+      {/* ===== 工作日配置 ===== */}
+      <div style={{ marginBottom: 12 }}>
+        <DaySelector weekNumber={cw} locked={false} onChange={setDayConfig} />
+      </div>
+
       {/* ===== 本周值班表（大，可操作） ===== */}
       <div className="card" style={{ marginBottom: 24 }}>
         <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -318,11 +333,11 @@ export default function Dashboard() {
               <thead>
                 <tr>
                   <th style={{ width: 60 }}>时段</th>
-                  {DAYS.map((d, di) => {
-                    const isToday = di + 1 === today
+                  {workdayList.map(day => {
+                    const isToday = day === today
                     return (
-                      <th key={d} style={isToday ? { background: '#FFF3E0', borderBottom: '3px solid #E65100' } : {}}>
-                        {d}
+                      <th key={day} style={isToday ? { background: '#FFF3E0', borderBottom: '3px solid #E65100' } : {}}>
+                        {ALL_DAYS[day - 1]}
                         {isToday && <span style={{ fontSize: 10, color: '#E65100', display: 'block' }}>今天</span>}
                       </th>
                     )
@@ -333,7 +348,7 @@ export default function Dashboard() {
                 {SLOTS.map(slot => (
                   <tr key={slot}>
                     <td style={{ fontWeight: 600, fontSize: 14 }}>{slot}</td>
-                    {[1, 2, 3, 4, 5].map(day => {
+                    {workdayList.map(day => {
                       const list = getAssignments(weekAssignments, day, slot)
                       const isToday = day === today
                       return (
@@ -384,7 +399,7 @@ export default function Dashboard() {
           <div style={{ marginTop: 10, display: 'flex', gap: 16, fontSize: 13, color: '#666', flexWrap: 'wrap' }}>
             <span>正常：<strong style={{ color: '#2E7D32' }}>{weekAssignments.filter(a => a.status === '正常').length}</strong> 人次</span>
             <span>请假：<strong style={{ color: '#E65100' }}>{weekAssignments.filter(a => a.status === '请假').length}</strong> 人次</span>
-            <span>覆盖：<strong>{[1,2,3,4,5].filter(d => weekAssignments.some(a => a.day_of_week === d && a.status === '正常')).length}/5</strong> 天</span>
+            <span>覆盖：<strong>{workdayList.filter(d => weekAssignments.some(a => a.day_of_week === d && a.status === '正常')).length}/{workdayList.length}</strong> 天</span>
           </div>
         )}
       </div>

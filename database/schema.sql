@@ -33,6 +33,14 @@ CREATE TABLE IF NOT EXISTS course_schedules (
   fri_34      BOOLEAN DEFAULT false,
   fri_67      BOOLEAN DEFAULT false,
   fri_89      BOOLEAN DEFAULT false,
+  -- 周六
+  sat_34      BOOLEAN DEFAULT false,
+  sat_67      BOOLEAN DEFAULT false,
+  sat_89      BOOLEAN DEFAULT false,
+  -- 周日
+  sun_34      BOOLEAN DEFAULT false,
+  sun_67      BOOLEAN DEFAULT false,
+  sun_89      BOOLEAN DEFAULT false,
   UNIQUE(member_id, week_type)
 );
 
@@ -122,12 +130,32 @@ CREATE POLICY "允许认证用户插入统计" ON duty_stats FOR INSERT TO authe
 CREATE POLICY "允许认证用户更新统计" ON duty_stats FOR UPDATE TO authenticated USING (true);
 
 -- =============================================
--- 插入默认时段配置（每时段默认1人）
+-- 7. 工作日配置表（调休/放假）
+-- =============================================
+CREATE TABLE IF NOT EXISTS day_config (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  week_number   INTEGER NOT NULL,
+  day_of_week   INTEGER NOT NULL CHECK (day_of_week BETWEEN 1 AND 7),
+  is_workday    BOOLEAN DEFAULT true,
+  UNIQUE(week_number, day_of_week)
+);
+
+-- =============================================
+-- RLS: day_config
+-- =============================================
+CREATE POLICY "允许认证用户读取工作日配置" ON day_config FOR SELECT TO authenticated USING (true);
+CREATE POLICY "允许认证用户插入工作日配置" ON day_config FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "允许认证用户更新工作日配置" ON day_config FOR UPDATE TO authenticated USING (true);
+
+-- =============================================
+-- 插入默认时段配置（每时段默认1人，含周六日）
 -- =============================================
 INSERT INTO slot_config (day_of_week, slot, required_count) VALUES
   (1, '上午', 1), (1, '下午1', 1), (1, '下午2', 1),
   (2, '上午', 1), (2, '下午1', 1), (2, '下午2', 1),
   (3, '上午', 1), (3, '下午1', 1), (3, '下午2', 1),
   (4, '上午', 1), (4, '下午1', 1), (4, '下午2', 1),
-  (5, '上午', 1), (5, '下午1', 1), (5, '下午2', 1)
+  (5, '上午', 1), (5, '下午1', 1), (5, '下午2', 1),
+  (6, '上午', 0), (6, '下午1', 0), (6, '下午2', 0),
+  (7, '上午', 0), (7, '下午1', 0), (7, '下午2', 0)
 ON CONFLICT (day_of_week, slot) DO NOTHING;

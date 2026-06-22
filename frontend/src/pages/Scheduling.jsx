@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase.js'
 import { runSchedulingAlgorithm } from '../lib/scheduling-algorithm.js'
+import DaySelector from '../components/DaySelector.jsx'
 
-const DAYS = ['周一', '周二', '周三', '周四', '周五']
-const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri']
+const ALL_DAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+const ALL_DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
 const SLOTS = ['上午', '下午1', '下午2']
 const SLOT_KEYS = ['34', '67', '89']
 
@@ -20,6 +21,7 @@ export default function Scheduling() {
   // 编辑时段人数
   const [editingSlot, setEditingSlot] = useState(null) // { day, slot }
   const [editValue, setEditValue] = useState('')
+  const [dayConfig, setDayConfig] = useState(null)
 
   useEffect(() => { loadAll() }, [])
   useEffect(() => { if (semesterConfig) loadAssignments() }, [weekNumber, semesterConfig])
@@ -85,7 +87,7 @@ export default function Scheduling() {
 
     await loadSlotConfig()
     setEditingSlot(null)
-    showToast(`${DAYS[day - 1]}${slot} 调整为 ${val} 人`, 'success')
+    showToast(`${ALL_DAYS[day - 1]}${slot} 调整为 ${val} 人`, 'success')
   }
 
   function cancelEdit() {
@@ -118,7 +120,8 @@ export default function Scheduling() {
       slotConfig, weekNumber,
       lastWeek: lastWeek || [], allAssignments: allAssignments || [],
       makeUpMembers: makeUpMembers || [],
-      otherWeekSchedules: otherWeekSchedules || []
+      otherWeekSchedules: otherWeekSchedules || [],
+      dayConfig
     })
 
     await supabase.from('assignments').delete().eq('week_number', weekNumber)
@@ -148,7 +151,7 @@ export default function Scheduling() {
     const weekType = isOddWeek(weekNumber) ? '单周' : '双周'
     const { data: schedules } = await supabase.from('course_schedules').select('*').eq('week_type', weekType)
     const { data: members } = await supabase.from('members').select('*').eq('active', true)
-    const dKey = DAY_KEYS[assignment.day_of_week - 1]
+    const dKey = ALL_DAY_KEYS[assignment.day_of_week - 1]
     const sKey = SLOT_KEYS[SLOTS.indexOf(assignment.slot)]
     const colKey = `${dKey}_${sKey}`
 
@@ -192,6 +195,13 @@ export default function Scheduling() {
     setToast({ msg, type })
     setTimeout(() => setToast(null), 3000)
   }
+
+  // 工作日列表
+  function getWorkdays() {
+    if (!dayConfig) return [1, 2, 3, 4, 5]
+    return [1, 2, 3, 4, 5, 6, 7].filter(d => dayConfig[d])
+  }
+  const workdayList = getWorkdays()
 
   if (loading) return <div className="page-container"><p>加载中...</p></div>
 
@@ -238,6 +248,11 @@ export default function Scheduling() {
         </div>
       )}
 
+      {/* 工作日配置 */}
+      <div style={{ marginBottom: 12 }}>
+        <DaySelector weekNumber={weekNumber} locked={isLocked} onChange={setDayConfig} />
+      </div>
+
       {/* 提示：点击表头数字可调整时段人数 */}
       {!isLocked && (
         <div style={{ fontSize: 13, color: '#999', marginBottom: 8 }}>
@@ -251,11 +266,10 @@ export default function Scheduling() {
             <thead>
               <tr>
                 <th>时段</th>
-                {DAYS.map((d, di) => {
-                  const day = di + 1
+                {workdayList.map(day => {
                   return (
-                    <th key={d}>
-                      {d}
+                    <th key={day}>
+                      {ALL_DAYS[day - 1]}
                       <br />
                       {SLOTS.map(slot => {
                         const key = `${day}_${slot}`
@@ -307,7 +321,7 @@ export default function Scheduling() {
               {SLOTS.map(slot => (
                 <tr key={slot}>
                   <td style={{ fontWeight: 600 }}>{slot}</td>
-                  {[1, 2, 3, 4, 5].map(day => {
+                  {workdayList.map(day => {
                     const list = getAssignment(day, slot)
                     const required = slotConfig[`${day}_${slot}`] || 0
                     return (

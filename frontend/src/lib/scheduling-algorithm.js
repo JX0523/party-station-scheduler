@@ -9,13 +9,14 @@
  * - 无人可排就空着，不强制填充
  */
 
-const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri']
+const ALL_DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
 const SLOTS = ['上午', '下午1', '下午2']
 const SLOT_KEYS = ['34', '67', '89']
 const ROLE_WEIGHT = { '部员': 0, '部长': 1, '主席团': 2 }
 
+/** 所有21个时段key（7天×3时段），用于跨周课表计算 */
 const ALL_SLOT_KEYS = []
-for (const d of DAY_KEYS) {
+for (const d of ALL_DAY_KEYS) {
   for (const s of SLOT_KEYS) {
     ALL_SLOT_KEYS.push(`${d}_${s}`)
   }
@@ -23,23 +24,40 @@ for (const d of DAY_KEYS) {
 
 /**
  * @param {Object} params
- * @param {Array}  params.members            - 所有活跃成员
- * @param {Array}  params.schedules          - 当前周类型的课表
- * @param {Object} params.slotConfig         - { "1_上午": 1, ... }
- * @param {number} params.weekNumber         - 第几周
- * @param {Array}  params.lastWeek           - 上周排班 [{member_id}, ...]
- * @param {Array}  params.allAssignments     - 所有历史正常排班
- * @param {Array}  params.makeUpMembers      - 需要补排的人 [{member_id}, ...]
- * @param {Array}  params.otherWeekSchedules - 另一周类型（单/双周）的课表
+ * @param {Array}   params.members            - 所有活跃成员
+ * @param {Array}   params.schedules          - 当前周类型的课表
+ * @param {Object}  params.slotConfig         - { "1_上午": 1, ... }
+ * @param {number}  params.weekNumber         - 第几周
+ * @param {Array}   params.lastWeek           - 上周排班 [{member_id}, ...]
+ * @param {Array}   params.allAssignments     - 所有历史正常排班
+ * @param {Array}   params.makeUpMembers      - 需要补排的人 [{member_id}, ...]
+ * @param {Array}   params.otherWeekSchedules - 另一周类型（单/双周）的课表
+ * @param {Object}  params.dayConfig          - { 1:true, 2:true, ... 7:false } 工作日配置
  * @returns {{ assignments: Array, meta: Object }}
  */
 export function runSchedulingAlgorithm({
   members, schedules, slotConfig, weekNumber,
   lastWeek, allAssignments, makeUpMembers,
-  otherWeekSchedules
+  otherWeekSchedules, dayConfig
 }) {
   const lastWeekIds = new Set((lastWeek || []).map(a => a.member_id))
   const makeUpIds = new Set((makeUpMembers || []).map(a => a.member_id))
+
+  // ===== 工作日列表（默认周一至周五） =====
+  const workdays = []
+  if (dayConfig) {
+    for (let d = 1; d <= 7; d++) {
+      if (dayConfig[d]) workdays.push(d)
+    }
+  }
+  if (workdays.length === 0) {
+    // 默认周一至周五
+    workdays.push(1, 2, 3, 4, 5)
+  }
+  const dayKeyMap = {} // dayNum → 'mon'/'tue'/...
+  for (let d = 1; d <= 7; d++) {
+    dayKeyMap[d] = ALL_DAY_KEYS[d - 1]
+  }
 
   // 历史排班次数统计
   const historyCount = {}
@@ -63,7 +81,7 @@ export function runSchedulingAlgorithm({
     for (const m of (members || [])) {
       const s = otherMap[m.id]
       if (!s) {
-        otherWeekFreeCount[m.id] = 15
+        otherWeekFreeCount[m.id] = ALL_SLOT_KEYS.length
       } else {
         let free = 0
         for (const key of ALL_SLOT_KEYS) {
@@ -81,35 +99,28 @@ export function runSchedulingAlgorithm({
   const totalMembers = (members || []).length
 
   // ===== 角色配额设计 =====
-  // 部长配额：部员充足时少量参与，部员不足时作主力
   let buZhangQuota = 0
   if (buZhangTotal > 0) {
     if (buYuanTotal >= 5) {
-      // 部员充足 → 部长少量参与（1-3人/周）
       buZhangQuota = Math.max(1, Math.min(3, Math.ceil(buZhangTotal * 0.2)))
     } else {
-      // 部员不足 → 部长作主力
       buZhangQuota = Math.max(5, Math.ceil(buZhangTotal / 2))
     }
   }
 
-  // 主席团：仅在部员+部长总数<5时启用
   const needZhuXi = (buYuanTotal + buZhangTotal < 5)
   const zhuXiQuota = needZhuXi
     ? Math.max(1, Math.ceil(zhuXiTotal / 2))
     : 0
 
-  // 全局上限
   const maxPerWeek = Math.max(5, Math.floor(totalMembers / 2))
 
-  // 每种角色每周上限
   const maxPerRoleThisWeek = {
     '部员': maxPerWeek,
     '部长': buZhangQuota,
     '主席团': zhuXiQuota
   }
 
-  // 角色标签
   let roleLabel
   if (needZhuXi) {
     roleLabel = '全部角色'
@@ -127,7 +138,6 @@ export function runSchedulingAlgorithm({
   const thisWeekAssigned = new Set()
   const roleCountThisWeek = { '部员': 0, '部长': 0, '主席团': 0 }
 
-  // 部长配额缺口（Phase2中用于提升部长优先级）
   function buZhangGap() {
     return Math.max(0, buZhangQuota - (roleCountThisWeek['部长'] || 0))
   }
@@ -137,9 +147,7 @@ export function runSchedulingAlgorithm({
     let pool = (members || []).filter(m => {
       if (thisWeekAssigned.has(m.id)) return false
       if (lastWeekIds.has(m.id)) return false
-      // 主席团仅在needZhuXi时允许
       if (m.role === '主席团' && !needZhuXi) return false
-      // 单角色超上限排除
       const cap = maxPerRoleThisWeek[m.role]
       if (cap !== undefined && (roleCountThisWeek[m.role] || 0) >= cap) return false
       if (extraFilter && !extraFilter(m)) return false
@@ -152,8 +160,7 @@ export function runSchedulingAlgorithm({
       const bMakeUp = makeUpIds.has(b.id) ? 0 : 1
       if (aMakeUp !== bMakeUp) return aMakeUp - bMakeUp
 
-      // 2. 配额优先：部长/主席团未达周配额时，优先于部员
-      //    （确保部长偶尔参与，不被其他排序规则淹没）
+      // 2. 配额优先：部长未达周配额时，优先于部员
       if (phase === 2) {
         const gap = buZhangGap()
         if (gap > 0) {
@@ -163,15 +170,14 @@ export function runSchedulingAlgorithm({
         }
       }
 
-      // 3. 另一周空闲越少（越忙）越优先 — 把灵活的人留给另一周
-      //    但只作为弱排序，不影响配额机制
+      // 3. 另一周空闲越少越优先
       if (otherWeekSchedules) {
-        const aOther = otherWeekFreeCount[a.id] ?? 15
-        const bOther = otherWeekFreeCount[b.id] ?? 15
+        const aOther = otherWeekFreeCount[a.id] ?? ALL_SLOT_KEYS.length
+        const bOther = otherWeekFreeCount[b.id] ?? ALL_SLOT_KEYS.length
         if (aOther !== bOther) return aOther - bOther
       }
 
-      // 4. 历史排班次数少的优先（长期公平）
+      // 4. 历史排班次数少的优先
       const hc = (historyCount[a.id] || 0) - (historyCount[b.id] || 0)
       if (hc !== 0) return hc
 
@@ -181,10 +187,11 @@ export function runSchedulingAlgorithm({
     return pool
   }
 
-  // ===== 第一阶段：每日覆盖（优先部员） =====
+  // ===== 第一阶段：每个工作日至少安排1人 =====
+  const workdaySet = new Set(workdays)
   for (let round = 0; round < 5; round++) {
     if (newAssignments.length >= maxPerWeek) break
-    const dayCounts = [1, 2, 3, 4, 5].map(d => ({
+    const dayCounts = workdays.map(d => ({
       day: d,
       cnt: newAssignments.filter(a => a.day_of_week === d).length
     })).sort((a, b) => a.cnt - b.cnt)
@@ -193,7 +200,7 @@ export function runSchedulingAlgorithm({
       if (cnt > 0) continue
       if (newAssignments.length >= maxPerWeek) break
 
-      const pool = getCandidates(null, 1) // Phase 1: 部员优先
+      const pool = getCandidates(null, 1)
       if (pool.length === 0) break
 
       const pick = pool[0]
@@ -215,11 +222,11 @@ export function runSchedulingAlgorithm({
     }
   }
 
-  // ===== 第二阶段：轮询补充（部长有配额） =====
+  // ===== 第二阶段：轮询补充 =====
   let madeProgress = true
   while (madeProgress && newAssignments.length < maxPerWeek) {
     madeProgress = false
-    const dayCounts = [1, 2, 3, 4, 5].map(d => ({
+    const dayCounts = workdays.map(d => ({
       day: d,
       cnt: newAssignments.filter(a => a.day_of_week === d).length
     })).sort((a, b) => a.cnt - b.cnt)
@@ -237,13 +244,14 @@ export function runSchedulingAlgorithm({
 
       for (const { slot } of slotCounts) {
         if (newAssignments.length >= maxPerWeek) break
-        const dKey = DAY_KEYS[day - 1]
+        const dKey = dayKeyMap[day]
+        const sKey = SLOT_KEYS[SLOTS.indexOf(slot)]
 
         const pool = getCandidates(m => {
           const s = scheduleMap[m.id]
           if (!s) return true
-          return !s[`${dKey}_${SLOT_KEYS[SLOTS.indexOf(slot)]}`]
-        }, 2) // Phase 2: 部长配额内可提升
+          return !s[`${dKey}_${sKey}`]
+        }, 2)
 
         if (pool.length > 0) {
           const pick = pool[0]
@@ -269,7 +277,8 @@ export function runSchedulingAlgorithm({
       maxPerWeek,
       totalMembers,
       perRoleMax: maxPerRoleThisWeek,
-      perRoleUsed: roleCountThisWeek
+      perRoleUsed: roleCountThisWeek,
+      workdays
     }
   }
 }

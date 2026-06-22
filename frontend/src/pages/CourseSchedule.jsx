@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase.js'
 
-const DAYS = ['周一', '周二', '周三', '周四', '周五']
+const ALL_DAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
 const SLOTS = [
   { key: '34', label: '第3-4节\n9:30-11:00' },
   { key: '67', label: '第6-7节\n14:00-15:30' },
   { key: '89', label: '第8-9节\n15:30-17:00' },
 ]
-const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri']
+const ALL_DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
 
 export default function CourseSchedule() {
   const [members, setMembers] = useState([])
@@ -30,13 +30,13 @@ export default function CourseSchedule() {
       .then(({ data }) => {
         if (data) {
           const s = {}
-          DAY_KEYS.forEach(d => {
+          ALL_DAY_KEYS.forEach(d => {
             SLOTS.forEach(slot => { s[`${d}_${slot.key}`] = data[`${d}_${slot.key}`] || false })
           })
           setSchedule(s)
         } else {
           const s = {}
-          DAY_KEYS.forEach(d => {
+          ALL_DAY_KEYS.forEach(d => {
             SLOTS.forEach(slot => { s[`${d}_${slot.key}`] = false })
           })
           setSchedule(s)
@@ -125,22 +125,24 @@ export default function CourseSchedule() {
           <div className="card-title">{selectedMember.name} 的{weekType}课表</div>
           <p style={{ fontSize: 13, color: '#999', marginBottom: 16 }}>
             🟢 绿色 = 没课（可值班）&nbsp;&nbsp;🔴 红色 = 有课（不可值班）&nbsp;&nbsp;点击格子切换
+            &nbsp;&nbsp;|&nbsp;&nbsp;周六日默认没课，仅调休时值班
           </p>
           <div className="table-wrapper">
             <table>
               <thead>
                 <tr>
                   <th>时段</th>
-                  {DAYS.map(d => <th key={d}>{d}</th>)}
+                  {ALL_DAYS.map(d => <th key={d} style={d.includes('六') || d.includes('日') ? { background: '#FFF8E1' } : {}}>{d}</th>)}
                 </tr>
               </thead>
               <tbody>
                 {SLOTS.map(slot => (
                   <tr key={slot.key}>
                     <td style={{ fontWeight: 600, whiteSpace: 'pre-line', textAlign: 'left' }}>{slot.label}</td>
-                    {DAY_KEYS.map(d => {
+                    {ALL_DAY_KEYS.map(d => {
                       const key = `${d}_${slot.key}`
                       const hasClass = schedule[key]
+                      const isWeekend = d === 'sat' || d === 'sun'
                       return (
                         <td key={key}
                           onClick={() => toggleSlot(key)}
@@ -151,6 +153,7 @@ export default function CourseSchedule() {
                             fontWeight: 600,
                             transition: 'all 0.15s',
                             userSelect: 'none',
+                            borderLeft: isWeekend ? '2px dashed #FFD54F' : undefined
                           }}
                         >
                           {hasClass ? '有课 ✗' : '没课 ✓'}
