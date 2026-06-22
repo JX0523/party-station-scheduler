@@ -430,7 +430,7 @@ export default function Dashboard() {
                       <thead>
                         <tr>
                           <th style={{ padding: '3px 6px' }}></th>
-                          {DAYS_SHORT.map(d => <th key={d} style={{ padding: '3px 4px', fontSize: 11 }}>{d}</th>)}
+                          {ALL_DAYS_SHORT.map(d => <th key={d} style={{ padding: '3px 4px', fontSize: 11 }}>{d}</th>)}
                         </tr>
                       </thead>
                       <tbody>
@@ -474,7 +474,7 @@ export default function Dashboard() {
           <div className="modal" onClick={e => e.stopPropagation()} style={{ minWidth: 420 }}>
             <div className="modal-header">
               <h3>{addMode === 'add'
-                ? `为 ${DAYS[(showAdd.day || showAdd.day_of_week) - 1]}${showAdd.slot || ''} 添加值班人`
+                ? `为 ${ALL_DAYS[(showAdd.day || showAdd.day_of_week) - 1]}${showAdd.slot || ''} 添加值班人`
                 : `为 ${showAdd.slot} 选择替补`}</h3>
               <button className="modal-close" onClick={() => { setShowAdd(null); setCandidates([]); setAddMode(null) }}>✕</button>
             </div>
