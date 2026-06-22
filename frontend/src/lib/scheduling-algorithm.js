@@ -203,21 +203,32 @@ export function runSchedulingAlgorithm({
       const pool = getCandidates(null, 1)
       if (pool.length === 0) break
 
-      const pick = pool[0]
-      for (let si = 0; si < 3; si++) {
-        const slot = SLOTS[si]
-        const required = slotConfig[`${day}_${slot}`] || 0
-        if (required > 0) {
-          thisWeekAssigned.add(pick.id)
-          roleCountThisWeek[pick.role] = (roleCountThisWeek[pick.role] || 0) + 1
-          newAssignments.push({
-            week_number: weekNumber, day_of_week: day, slot,
-            member_id: pick.id, is_emergency: false,
-            status: '正常', leave_next_week: false
-          })
-          historyCount[pick.id] = (historyCount[pick.id] || 0) + 1
-          break
+      // 尝试从pool中找到该天有可用时段的人
+      let assigned = false
+      for (let pi = 0; pi < Math.min(3, pool.length); pi++) {
+        const pick = pool[pi]
+        const dKey = dayKeyMap[day]
+        for (let si = 0; si < 3; si++) {
+          const slot = SLOTS[si]
+          const sKey = SLOT_KEYS[si]
+          const required = slotConfig[`${day}_${slot}`] || 0
+          if (required > 0) {
+            // 检查课表冲突
+            const sc = scheduleMap[pick.id]
+            if (sc && sc[`${dKey}_${sKey}`]) continue // 该时段有课，跳过
+            assigned = true
+            thisWeekAssigned.add(pick.id)
+            roleCountThisWeek[pick.role] = (roleCountThisWeek[pick.role] || 0) + 1
+            newAssignments.push({
+              week_number: weekNumber, day_of_week: day, slot,
+              member_id: pick.id, is_emergency: false,
+              status: '正常', leave_next_week: false
+            })
+            historyCount[pick.id] = (historyCount[pick.id] || 0) + 1
+            break
+          }
         }
+        if (assigned) break
       }
     }
   }
