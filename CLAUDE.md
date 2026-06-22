@@ -27,7 +27,7 @@
 4. **每日收尾**：更新 `dev-logs/` 中当天的日志文件
 5. **分步推进**：每个阶段完成后暂停，确认无误再进行下一阶段
 
-## 项目结构（规划）
+## 项目结构
 
 ```
 党员工作站排班系统/
@@ -39,12 +39,14 @@
 │   └── execution-plan.md     # 执行计划
 ├── dev-logs/                 # 开发日志
 │   └── YYYY-MM-DD.md
-├── frontend/                 # React前端项目（待创建）
+├── frontend/                 # React前端项目
 │   ├── src/
-│   │   ├── components/       # 可复用组件
-│   │   ├── pages/            # 页面组件
+│   │   ├── components/       # 可复用组件（Navbar, Layout, DaySelector）
+│   │   ├── pages/            # 页面组件（Dashboard, Scheduling, Members...）
 │   │   ├── hooks/            # 自定义Hooks
-│   │   ├── lib/              # 工具函数、Supabase客户端
+│   │   ├── lib/              # Supabase客户端、排班算法
+│   │   │   ├── supabase.js
+│   │   │   └── scheduling-algorithm.js
 │   │   ├── styles/           # 全局样式
 │   │   ├── App.jsx
 │   │   └── main.jsx
@@ -52,8 +54,14 @@
 │   ├── index.html
 │   ├── package.json
 │   └── vite.config.js
-└── database/                 # 数据库相关（待创建）
-    └── schema.sql            # 建表SQL
+├── database/                 # 数据库相关
+│   ├── schema.sql            # 建表SQL（含RLS、默认数据）
+│   ├── migration-dayoff.sql  # 调休功能迁移v1
+│   └── migration-dayoff-v2.sql # 调休课表映射迁移v2
+├── test-algorithm.mjs        # 算法单元测试（27项）
+├── test-phase1-fix.mjs       # 课表冲突+调休测试（32项）
+├── test-comprehensive.mjs    # 综合场景测试（49项）
+└── test-full-semester.mjs    # 全学期模拟测试（14项）
 ```
 
 ## 快速命令

@@ -80,6 +80,14 @@ CREATE TABLE course_schedules (
   fri_34      BOOLEAN DEFAULT false,
   fri_67      BOOLEAN DEFAULT false,
   fri_89      BOOLEAN DEFAULT false,
+  -- 周六
+  sat_34      BOOLEAN DEFAULT false,
+  sat_67      BOOLEAN DEFAULT false,
+  sat_89      BOOLEAN DEFAULT false,
+  -- 周日
+  sun_34      BOOLEAN DEFAULT false,
+  sun_67      BOOLEAN DEFAULT false,
+  sun_89      BOOLEAN DEFAULT false,
   UNIQUE(member_id, week_type)
 );
 ```
@@ -91,6 +99,7 @@ CREATE TABLE semester_config (
   name              TEXT NOT NULL DEFAULT '新学期',
   first_week_is_odd BOOLEAN DEFAULT true,
   total_weeks       INTEGER DEFAULT 20,
+  current_week      INTEGER DEFAULT 1,
   current_mode      TEXT DEFAULT '一般' CHECK (current_mode IN ('一般', '紧急')),
   created_at        TIMESTAMPTZ DEFAULT now()
 );
@@ -100,7 +109,7 @@ CREATE TABLE semester_config (
 ```sql
 CREATE TABLE slot_config (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  day_of_week     INTEGER NOT NULL CHECK (day_of_week BETWEEN 1 AND 5),
+  day_of_week     INTEGER NOT NULL CHECK (day_of_week BETWEEN 1 AND 7),
   slot            TEXT NOT NULL CHECK (slot IN ('上午', '下午1', '下午2')),
   required_count  INTEGER DEFAULT 1,
   UNIQUE(day_of_week, slot)
@@ -112,7 +121,7 @@ CREATE TABLE slot_config (
 CREATE TABLE assignments (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   week_number       INTEGER NOT NULL,
-  day_of_week       INTEGER NOT NULL CHECK (day_of_week BETWEEN 1 AND 5),
+  day_of_week       INTEGER NOT NULL CHECK (day_of_week BETWEEN 1 AND 7),
   slot              TEXT NOT NULL CHECK (slot IN ('上午', '下午1', '下午2')),
   member_id         UUID REFERENCES members(id) ON DELETE CASCADE,
   is_emergency      BOOLEAN DEFAULT false,
@@ -134,7 +143,33 @@ CREATE TABLE duty_stats (
 );
 ```
 
-## 4. API 调用方式
+### 3.7 day_config — 工作日配置（调休/放假）
+```sql
+CREATE TABLE day_config (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  week_number     INTEGER NOT NULL,
+  day_of_week     INTEGER NOT NULL CHECK (day_of_week BETWEEN 1 AND 7),
+  is_workday      BOOLEAN DEFAULT true,
+  substitute_for  INTEGER DEFAULT NULL,  -- NULL=无映射, 1-5=补周几的课
+  UNIQUE(week_number, day_of_week)
+);
+```
+
+`substitute_for` 用于调休课表映射：周六补周一的课 → `substitute_for = 1`，算法会用 `mon_*` 而非 `sat_*` 检查课表冲突。
+
+## 4. 前端架构要点
+
+### 4.1 排班算法
+- **文件**：`frontend/src/lib/scheduling-algorithm.js`
+- **入口**：`runSchedulingAlgorithm(params)` — 两阶段算法（Phase 1 每日覆盖 + Phase 2 轮询补充）
+- **调休映射**：`resolveScheduleKey(dayOfWeek, dayConfig)` — 根据 `substituteFor` 返回课表 key
+
+### 4.2 防重复生成
+- `Dashboard.jsx` 和 `Scheduling.jsx` 使用 `useRef` 互斥锁 (`generatingRef`) 防止并发生成导致重复排班
+- `try/finally` 确保异常时锁也释放
+- 已移除 `<StrictMode>`（开发模式双重挂载会触发并发生成）
+
+## 5. API 调用方式
 
 不写后端代码，前端直接通过 Supabase JS Client 调用数据库：
 
@@ -150,7 +185,7 @@ const { data, error } = await supabase
 
 所有数据库操作通过 Supabase 的 Row Level Security (RLS) 策略保护。
 
-## 5. 安全策略
+## 6. 安全策略
 
 - Supabase Auth 管理登录
 - RLS 策略：仅认证用户可读写

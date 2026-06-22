@@ -133,12 +133,16 @@ CREATE POLICY "允许认证用户更新统计" ON duty_stats FOR UPDATE TO authe
 -- 7. 工作日配置表（调休/放假）
 -- =============================================
 CREATE TABLE IF NOT EXISTS day_config (
-  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  week_number   INTEGER NOT NULL,
-  day_of_week   INTEGER NOT NULL CHECK (day_of_week BETWEEN 1 AND 7),
-  is_workday    BOOLEAN DEFAULT true,
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  week_number     INTEGER NOT NULL,
+  day_of_week     INTEGER NOT NULL CHECK (day_of_week BETWEEN 1 AND 7),
+  is_workday      BOOLEAN DEFAULT true,
+  substitute_for  INTEGER DEFAULT NULL,  -- NULL=无映射, 1-5=补周几的课
   UNIQUE(week_number, day_of_week)
 );
+
+-- 为已有数据库补加 substitute_for 列
+ALTER TABLE day_config ADD COLUMN IF NOT EXISTS substitute_for INTEGER DEFAULT NULL;
 
 -- =============================================
 -- RLS: day_config

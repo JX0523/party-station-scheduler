@@ -718,6 +718,64 @@ console.log('\n📋 场景15: 纯周末调休 — 仅周六日工作日')
 }
 
 // ================================================================
+// 场景16: 调休课表映射 — 周六补周一，算法用周一课表检查冲突
+// ================================================================
+console.log('\n📋 场景16: 调休课表映射 — 周六补周一，冲突检查用mon_*')
+{
+  const members = makeMembers({ '部员': 15, '部长': 3 })
+  // m1-m3: 周一上午有课(mon_34)，但周六全空
+  // m4-m6: 周六上午有课(sat_34)，但周一全空
+  const schedules = members.map((m, i) => {
+    const s = { member_id: m.id, week_type: '单周' }
+    for (const k of ALL_SLOT_KEYS) s[k] = false
+    if (i < 3) s['mon_34'] = true       // 前3人周一上午有课
+    if (i >= 3 && i < 6) s['sat_34'] = true  // 中3人周六上午有课
+    if (i >= 6 && i < 9) s['mon_34'] = true; s['mon_67'] = true  // 后3人周一全天有课
+    return s
+  })
+
+  // Rich dayConfig: 周六补周一
+  const dayConfig = {
+    1: true, 2: true, 3: true, 4: true, 5: true,
+    6: { isWorkday: true, substituteFor: 1 }
+  }
+  const slotConfig = makeSlotConfig([1, 2, 3, 4, 5, 6], 1)
+
+  const r = runSchedulingAlgorithm({
+    members, schedules, slotConfig,
+    weekNumber: 1, lastWeek: [], allAssignments: [],
+    makeUpMembers: [], otherWeekSchedules: schedules,
+    dayConfig
+  })
+
+  const satAssigns = r.assignments.filter(a => a.day_of_week === 6)
+  const satAM = satAssigns.filter(a => a.slot === '上午')
+  // 周六上午：m1-m3有mon_34（应被排除），m4-m6有sat_34（不应被排除，因为调休后查mon_*）
+  console.log(`  周六共${satAssigns.length}人, 上午${satAM.length}人`)
+
+  // 检查：有mon_34的人不应出现在周六上午
+  const monBusyIds = members.slice(0, 3).map(m => m.id)
+  const satAMIds = new Set(satAM.map(a => a.member_id))
+  const conflictFromMon = monBusyIds.filter(id => satAMIds.has(id))
+  assert('mon_34有课的人不排周六上午', conflictFromMon.length === 0,
+    `排了${conflictFromMon.length}人`)
+
+  // 检查：有sat_34的人可以排周六上午（因为调休后查的是mon_*不是sat_*）
+  const satBusyIds = members.slice(3, 6).map(m => m.id)
+  const satBusyInAM = satBusyIds.filter(id => satAMIds.has(id))
+  console.log(`  sat_34有课的人在周六上午: ${satBusyInAM.length}人（应该被允许）`)
+
+  // 周六上午至少有人（从没有mon_34的人中选）
+  assert('周六上午有人值班', satAM.length > 0)
+
+  // 周一上午：m1-m3有mon_34不应被排
+  const monAM = r.assignments.filter(a => a.day_of_week === 1 && a.slot === '上午')
+  const monAMIds = new Set(monAM.map(a => a.member_id))
+  const monConflict = monBusyIds.filter(id => monAMIds.has(id))
+  assert('mon_34有课的人也不排周一上午', monConflict.length === 0)
+}
+
+// ================================================================
 // 汇总
 // ================================================================
 console.log('\n' + '='.repeat(65))

@@ -105,7 +105,7 @@ export default function DaySelector({ weekNumber, locked, onChange }) {
     setDayConfig(newConfig)
     if (onChange) onChange(newConfig)
 
-    // Update DB
+    // Upsert DB（防止toggle尚未完成保存的竞态条件）
     const { data: existing } = await supabase
       .from('day_config')
       .select('id')
@@ -114,6 +114,14 @@ export default function DaySelector({ weekNumber, locked, onChange }) {
       .maybeSingle()
     if (existing) {
       await supabase.from('day_config').update({ substitute_for: sub }).eq('id', existing.id)
+    } else {
+      // 记录尚不存在（toggle保存未完成）→ 插入完整记录
+      await supabase.from('day_config').insert({
+        week_number: weekNumber,
+        day_of_week: day,
+        is_workday: true,
+        substitute_for: sub
+      })
     }
   }
 

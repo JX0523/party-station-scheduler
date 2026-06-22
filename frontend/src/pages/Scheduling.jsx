@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase.js'
 import { runSchedulingAlgorithm, resolveScheduleKey } from '../lib/scheduling-algorithm.js'
 import DaySelector from '../components/DaySelector.jsx'
@@ -22,6 +22,7 @@ export default function Scheduling() {
   const [editingSlot, setEditingSlot] = useState(null) // { day, slot }
   const [editValue, setEditValue] = useState('')
   const [dayConfig, setDayConfig] = useState(null)
+  const generatingRef = useRef(false)  // 防止并发生成导致重复排班
 
   useEffect(() => { loadAll() }, [])
   useEffect(() => { if (semesterConfig) loadAssignments() }, [weekNumber, semesterConfig])
@@ -103,38 +104,46 @@ export default function Scheduling() {
   async function handleGenerate() {
     if (!semesterConfig) return showToast('请先设置学期配置', 'error')
     if (isLocked) return showToast('该周已结束，排班已锁定不可修改', 'error')
+    if (generatingRef.current) return  // 防止并发生成
+    generatingRef.current = true
     setGenerating(true)
+    try {
+      const weekType = isOddWeek(weekNumber) ? '单周' : '双周'
+      const otherWeekType = weekType === '单周' ? '双周' : '单周'
 
-    const weekType = isOddWeek(weekNumber) ? '单周' : '双周'
-    const otherWeekType = weekType === '单周' ? '双周' : '单周'
+      const { data: members } = await supabase.from('members').select('*').eq('active', true)
+      const { data: schedules } = await supabase.from('course_schedules').select('*').eq('week_type', weekType)
+      const { data: otherWeekSchedules } = await supabase.from('course_schedules').select('*').eq('week_type', otherWeekType)
+      const { data: lastWeek } = await supabase.from('assignments').select('member_id').eq('week_number', weekNumber - 1)
+      const { data: allAssignments } = await supabase.from('assignments').select('member_id').eq('status', '正常')
+      const { data: makeUpMembers } = await supabase.from('assignments').select('member_id').eq('leave_next_week', true)
 
-    const { data: members } = await supabase.from('members').select('*').eq('active', true)
-    const { data: schedules } = await supabase.from('course_schedules').select('*').eq('week_type', weekType)
-    const { data: otherWeekSchedules } = await supabase.from('course_schedules').select('*').eq('week_type', otherWeekType)
-    const { data: lastWeek } = await supabase.from('assignments').select('member_id').eq('week_number', weekNumber - 1)
-    const { data: allAssignments } = await supabase.from('assignments').select('member_id').eq('status', '正常')
-    const { data: makeUpMembers } = await supabase.from('assignments').select('member_id').eq('leave_next_week', true)
+      const result = runSchedulingAlgorithm({
+        members: members || [], schedules: schedules || [],
+        slotConfig, weekNumber,
+        lastWeek: lastWeek || [], allAssignments: allAssignments || [],
+        makeUpMembers: makeUpMembers || [],
+        otherWeekSchedules: otherWeekSchedules || [],
+        dayConfig
+      })
 
-    const result = runSchedulingAlgorithm({
-      members: members || [], schedules: schedules || [],
-      slotConfig, weekNumber,
-      lastWeek: lastWeek || [], allAssignments: allAssignments || [],
-      makeUpMembers: makeUpMembers || [],
-      otherWeekSchedules: otherWeekSchedules || [],
-      dayConfig
-    })
+      await supabase.from('assignments').delete().eq('week_number', weekNumber)
+      if (result.assignments.length > 0) {
+        await supabase.from('assignments').insert(result.assignments)
+      }
+      if (makeUpMembers && makeUpMembers.length > 0) {
+        await supabase.from('assignments').update({ leave_next_week: false }).eq('leave_next_week', true)
+      }
 
-    await supabase.from('assignments').delete().eq('week_number', weekNumber)
-    if (result.assignments.length > 0) {
-      await supabase.from('assignments').insert(result.assignments)
+      loadAssignments()
+      showToast(`成功生成 ${result.assignments.length} 条排班（${result.meta.roleLabel}，上限${result.meta.maxPerWeek}人）`, 'success')
+    } catch (e) {
+      console.error('生成排班失败:', e)
+      showToast('生成失败，请重试', 'error')
+    } finally {
+      setGenerating(false)
+      generatingRef.current = false
     }
-    if (makeUpMembers && makeUpMembers.length > 0) {
-      await supabase.from('assignments').update({ leave_next_week: false }).eq('leave_next_week', true)
-    }
-
-    setGenerating(false)
-    loadAssignments()
-    showToast(`成功生成 ${result.assignments.length} 条排班（${result.meta.roleLabel}，上限${result.meta.maxPerWeek}人）`, 'success')
   }
 
   // ===== 请假 =====
