@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase.js'
-import { runSchedulingAlgorithm } from '../lib/scheduling-algorithm.js'
+import { runSchedulingAlgorithm, resolveScheduleKey } from '../lib/scheduling-algorithm.js'
 import DaySelector from '../components/DaySelector.jsx'
 
 const ALL_DAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
@@ -151,7 +151,7 @@ export default function Scheduling() {
     const weekType = isOddWeek(weekNumber) ? '单周' : '双周'
     const { data: schedules } = await supabase.from('course_schedules').select('*').eq('week_type', weekType)
     const { data: members } = await supabase.from('members').select('*').eq('active', true)
-    const dKey = ALL_DAY_KEYS[assignment.day_of_week - 1]
+    const dKey = resolveScheduleKey(assignment.day_of_week, dayConfig)
     const sKey = SLOT_KEYS[SLOTS.indexOf(assignment.slot)]
     const colKey = `${dKey}_${sKey}`
 
@@ -199,7 +199,10 @@ export default function Scheduling() {
   // 工作日列表
   function getWorkdays() {
     if (!dayConfig) return [1, 2, 3, 4, 5]
-    return [1, 2, 3, 4, 5, 6, 7].filter(d => dayConfig[d])
+    return [1, 2, 3, 4, 5, 6, 7].filter(d => {
+      const v = dayConfig[d]
+      return typeof v === 'object' ? v.isWorkday : v
+    })
   }
   const workdayList = getWorkdays()
 

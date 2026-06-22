@@ -43,20 +43,36 @@ export function runSchedulingAlgorithm({
   const lastWeekIds = new Set((lastWeek || []).map(a => a.member_id))
   const makeUpIds = new Set((makeUpMembers || []).map(a => a.member_id))
 
-  // ===== 工作日列表（默认周一至周五） =====
+  // ===== 工作日列表 + 调休课表映射（默认周一至周五） =====
   const workdays = []
+  const daySubstitutions = {} // { 6: 3 } 周六补周三的课
   if (dayConfig) {
     for (let d = 1; d <= 7; d++) {
-      if (dayConfig[d]) workdays.push(d)
+      const v = dayConfig[d]
+      if (typeof v === 'object' && v !== null) {
+        if (v.isWorkday) {
+          workdays.push(d)
+          if (v.substituteFor && v.substituteFor >= 1 && v.substituteFor <= 5) {
+            daySubstitutions[d] = v.substituteFor
+          }
+        }
+      } else if (v) {
+        workdays.push(d)
+      }
     }
   }
   if (workdays.length === 0) {
     // 默认周一至周五
     workdays.push(1, 2, 3, 4, 5)
   }
-  const dayKeyMap = {} // dayNum → 'mon'/'tue'/...
+  const dayKeyMap = {} // dayNum → 'mon'/'tue'/...（调休日用被补天的 key）
   for (let d = 1; d <= 7; d++) {
-    dayKeyMap[d] = ALL_DAY_KEYS[d - 1]
+    const sub = daySubstitutions[d]
+    if (sub && sub >= 1 && sub <= 5) {
+      dayKeyMap[d] = ALL_DAY_KEYS[sub - 1] // 调休日使用被补工作日的课表
+    } else {
+      dayKeyMap[d] = ALL_DAY_KEYS[d - 1]
+    }
   }
 
   // 历史排班次数统计
@@ -211,7 +227,8 @@ export function runSchedulingAlgorithm({
         for (let si = 0; si < 3; si++) {
           const slot = SLOTS[si]
           const sKey = SLOT_KEYS[si]
-          const required = slotConfig[`${day}_${slot}`] || 0
+          let required = slotConfig[`${day}_${slot}`] || 0
+          if (workdaySet.has(day)) required = Math.max(required, 1)
           if (required > 0) {
             // 检查课表冲突
             const sc = scheduleMap[pick.id]
@@ -247,7 +264,8 @@ export function runSchedulingAlgorithm({
 
       const slotCounts = [0, 1, 2].map(si => {
         const slot = SLOTS[si]
-        const required = slotConfig[`${day}_${slot}`] || 0
+        let required = slotConfig[`${day}_${slot}`] || 0
+        if (workdaySet.has(day)) required = Math.max(required, 1)
         const already = newAssignments.filter(a => a.day_of_week === day && a.slot === slot).length
         return { si, slot, required, already, need: required - already }
       }).filter(s => s.need > 0)
@@ -292,4 +310,21 @@ export function runSchedulingAlgorithm({
       workdays
     }
   }
+}
+
+/**
+ * 根据 dayConfig 解析某天实际使用的课表 key
+ * 调休场景：周六补周一的课 → resolveScheduleKey(6, dayConfig) → 'mon'
+ * @param {number} dayOfWeek 1-7
+ * @param {Object|null} dayConfig
+ * @returns {string} 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun'
+ */
+export function resolveScheduleKey(dayOfWeek, dayConfig) {
+  if (!dayConfig) return ALL_DAY_KEYS[dayOfWeek - 1]
+  const v = dayConfig[dayOfWeek]
+  if (typeof v === 'object' && v !== null && v.substituteFor) {
+    const sub = v.substituteFor
+    if (sub >= 1 && sub <= 5) return ALL_DAY_KEYS[sub - 1]
+  }
+  return ALL_DAY_KEYS[dayOfWeek - 1]
 }
