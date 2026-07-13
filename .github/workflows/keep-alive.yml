@@ -1,0 +1,19 @@
+name: Keep Supabase Alive
+
+# 每周日 UTC 0:00 自动 ping 一次，防止免费项目因7天不活跃被暂停
+on:
+  schedule:
+    - cron: '0 0 * * 0'
+  workflow_dispatch:  # 也支持手动触发
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase (prevent auto-pause)
+        run: |
+          curl -s -X GET \
+            "${{ secrets.VITE_SUPABASE_URL }}/rest/v1/members?select=id&limit=1" \
+            -H "apikey: ${{ secrets.VITE_SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.VITE_SUPABASE_ANON_KEY }}" \
+            -o /dev/null -w "HTTP %{http_code} - Supabase ping OK"
