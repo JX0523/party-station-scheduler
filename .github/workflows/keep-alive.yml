@@ -1,10 +1,11 @@
 name: Keep Supabase Alive
 
 # 每周日 UTC 0:00 自动 ping 一次，防止免费项目因7天不活跃被暂停
+# 也支持手动触发（Actions 面板 → Keep Supabase Alive → Run workflow）
 on:
   schedule:
-    - cron: '0 0 * * 0'
-  workflow_dispatch:  # 也支持手动触发
+    - cron: '7 3 * * 0'  # 每周日 UTC 03:07（避开整点高峰，北京时间周日上午11:07）
+  workflow_dispatch:
 
 jobs:
   ping:
@@ -12,8 +13,34 @@ jobs:
     steps:
       - name: Ping Supabase (prevent auto-pause)
         run: |
-          curl -s -X GET \
-            "${{ secrets.VITE_SUPABASE_URL }}/rest/v1/members?select=id&limit=1" \
-            -H "apikey: ${{ secrets.VITE_SUPABASE_ANON_KEY }}" \
-            -H "Authorization: Bearer ${{ secrets.VITE_SUPABASE_ANON_KEY }}" \
-            -o /dev/null -w "HTTP %{http_code} - Supabase ping OK"
+          set -euo pipefail
+
+          SUPABASE_URL="${{ secrets.VITE_SUPABASE_URL }}"
+          SUPABASE_KEY="${{ secrets.VITE_SUPABASE_ANON_KEY }}"
+
+          # 校验 secrets 已配置
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_KEY" ]; then
+            echo "::error::GitHub Secrets 未配置 VITE_SUPABASE_URL 或 VITE_SUPABASE_ANON_KEY"
+            echo "请在 GitHub 仓库 Settings → Secrets and variables → Actions → 添加这两个 Secret"
+            exit 1
+          fi
+
+          # 去掉 URL 末尾的斜杠，避免出现双斜杠 /rest/...
+          SUPA_URL="${SUPABASE_URL%/}"
+
+          echo "→ Pinging ${SUPA_URL} ..."
+          HTTP_CODE=$(curl -w "%{http_code}" \
+            --max-time 30 \
+            --retry 2 \
+            -X GET \
+            "${SUPA_URL}/rest/v1/members?select=id&limit=1" \
+            -H "apikey: ${SUPABASE_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_KEY}" \
+            -o /dev/null)
+
+          if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "401" ]; then
+            echo "✅ Supabase ping OK (HTTP ${HTTP_CODE}) — 不活跃计时器已重置"
+          else
+            echo "::error::Supabase 返回 HTTP ${HTTP_CODE}，请检查 Secrets 配置"
+            exit 1
+          fi
