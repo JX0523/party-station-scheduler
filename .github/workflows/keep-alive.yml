@@ -1,10 +1,12 @@
 name: Keep Supabase Alive
 
-# 每周日 UTC 0:00 自动 ping 一次，防止免费项目因7天不活跃被暂停
+# 每3天自动 ping 一次，防止免费项目因7天不活跃被暂停
+# 每周日 + 周三 UTC 03:07 — 两次间隔不超过4天，远低于7天阈值
 # 也支持手动触发（Actions 面板 → Keep Supabase Alive → Run workflow）
 on:
   schedule:
-    - cron: '7 3 * * 0'  # 每周日 UTC 03:07（避开整点高峰，北京时间周日上午11:07）
+    - cron: '7 3 * * 0'  # 每周日 UTC 03:07（北京时间周日上午11:07）
+    - cron: '7 3 * * 3'  # 每周三 UTC 03:07（北京时间周三上午11:07）
   workflow_dispatch:
 
 jobs:
