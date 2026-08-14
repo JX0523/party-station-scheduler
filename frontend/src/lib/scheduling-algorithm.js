@@ -7,6 +7,19 @@
  * - 部长：偶尔参与（每周2-3人），不排除
  * - 主席团：仅在部员+部长总数<5时才启用
  * - 无人可排就空着，不强制填充
+ *
+ * 排班模式（mode 参数）：
+ * - '一般'（默认）：不安排同一人连续两周值班（连续性约束）
+ * - '紧急'：允许连续安排，确保每天每时段都有人（is_emergency 标记为 true）
+ *
+ * 2026-08-14 修复记录（详见 dev-logs/2026-08-14.md）：
+ * 1. 补排优先覆盖连续性约束：上周请假（leave_next_week=true）的人即使出现在
+ *    lastWeek 中，也会被优先补排，而不是被连续性规则排除（原为死代码）。
+ * 2. 紧急模式：mode='紧急' 时跳过连续性约束，且生成的排班 is_emergency=true。
+ * 3. 时段人数=0 的语义：某时段 required=0 表示该时段不需要值班，不再被
+ *    工作日保护强制填 1 人；仅当某天至少一个时段 required>0 时，才保证
+ *    该天有 1 人（优先填 required 时段，全部冲突时回退到空闲时段）。
+ * 4. maxPerWeek 上限不再压制时段配置：上限 = max(配置需求总和, 公平性下限)。
  */
 
 const ALL_DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
@@ -26,21 +39,23 @@ for (const d of ALL_DAY_KEYS) {
  * @param {Object} params
  * @param {Array}   params.members            - 所有活跃成员
  * @param {Array}   params.schedules          - 当前周类型的课表
- * @param {Object}  params.slotConfig         - { "1_上午": 1, ... }
+ * @param {Object}  params.slotConfig         - { "1_上午": 1, ... } 每时段需要几人（0=该时段不需要值班）
  * @param {number}  params.weekNumber         - 第几周
- * @param {Array}   params.lastWeek           - 上周排班 [{member_id}, ...]
+ * @param {Array}   params.lastWeek           - 上周排班 [{member_id}, ...]（一般模式排除；紧急模式忽略）
  * @param {Array}   params.allAssignments     - 所有历史正常排班
- * @param {Array}   params.makeUpMembers      - 需要补排的人 [{member_id}, ...]
+ * @param {Array}   params.makeUpMembers      - 需要补排的人 [{member_id}, ...]（优先级最高，覆盖连续性约束）
  * @param {Array}   params.otherWeekSchedules - 另一周类型（单/双周）的课表
  * @param {Object}  params.dayConfig          - { 1:true, 2:true, ... 7:false } 工作日配置
  * @param {string}  params.weekType           - '单周' | '双周'
+ * @param {string}  [params.mode]             - '一般' | '紧急'，默认 '一般'
  * @returns {{ assignments: Array, meta: Object }}
  */
 export function runSchedulingAlgorithm({
   members, schedules, slotConfig, weekNumber,
   lastWeek, allAssignments, makeUpMembers,
-  otherWeekSchedules, dayConfig, weekType
+  otherWeekSchedules, dayConfig, weekType, mode = '一般'
 }) {
+  const isEmergency = mode === '紧急'
   const lastWeekIds = new Set((lastWeek || []).map(a => a.member_id))
   const makeUpIds = new Set((makeUpMembers || []).map(a => a.member_id))
 
@@ -134,7 +149,18 @@ export function runSchedulingAlgorithm({
     ? Math.max(1, Math.ceil(zhuXiTotal / 2))
     : 0
 
-  const maxPerWeek = Math.max(5, Math.floor(totalMembers / 2))
+  // ===== 每周总人次上限 =====
+  // 公平性下限：防止把值班集中在少数人（原有逻辑，保持不变）
+  const fairnessBase = Math.max(5, Math.floor(totalMembers / 2))
+  // 配置需求总和：所有工作日×时段的 required 之和。
+  // 上限 = max(需求, 公平下限)，保证「时段人数配置」不会被上限压制。
+  let neededTotal = 0
+  for (const d of workdays) {
+    for (const slot of SLOTS) {
+      neededTotal += (slotConfig ? (slotConfig[`${d}_${slot}`] || 0) : 0)
+    }
+  }
+  const maxPerWeek = Math.max(fairnessBase, neededTotal)
 
   const maxPerRoleThisWeek = {
     '部员': maxPerWeek,
@@ -167,7 +193,10 @@ export function runSchedulingAlgorithm({
   function getCandidates(extraFilter, phase = 1) {
     let pool = (members || []).filter(m => {
       if (thisWeekAssigned.has(m.id)) return false
-      if (lastWeekIds.has(m.id)) return false
+      // 连续性约束：一般模式排除上周已值班的人。
+      // 补排人员（makeUpIds）例外——上周请假的人本周必须优先补排；
+      // 紧急模式完全跳过连续性约束。
+      if (!isEmergency && lastWeekIds.has(m.id) && !makeUpIds.has(m.id)) return false
       if (m.role === '主席团' && !needZhuXi) return false
       const cap = maxPerRoleThisWeek[m.role]
       if (cap !== undefined && (roleCountThisWeek[m.role] || 0) >= cap) return false
@@ -208,8 +237,28 @@ export function runSchedulingAlgorithm({
     return pool
   }
 
+  // 记录一条排班
+  function assign(pick, day, slot) {
+    thisWeekAssigned.add(pick.id)
+    roleCountThisWeek[pick.role] = (roleCountThisWeek[pick.role] || 0) + 1
+    newAssignments.push({
+      week_number: weekNumber, day_of_week: day, slot,
+      member_id: pick.id, is_emergency: isEmergency,
+      status: '正常', leave_next_week: false
+    })
+    historyCount[pick.id] = (historyCount[pick.id] || 0) + 1
+  }
+
+  // 判断某天是否配置了值班需求（至少一个时段 required>0）
+  function dayHasRequired(day) {
+    return SLOTS.some(slot => (slotConfig[`${day}_${slot}`] || 0) > 0)
+  }
+
   // ===== 第一阶段：每个工作日至少安排1人 =====
-  const workdaySet = new Set(workdays)
+  // 规则：
+  //   - 某天没有任何 required>0 的时段 → 视为当天不需要值班，跳过
+  //   - 优先把值班人安排在 required>0 的时段
+  //   - 若 required 时段全部被课表挡住 → 回退到当天第一个空闲时段（每日最低保障）
   for (let round = 0; round < 5; round++) {
     if (newAssignments.length >= maxPerWeek) break
     const dayCounts = workdays.map(d => ({
@@ -220,37 +269,46 @@ export function runSchedulingAlgorithm({
     for (const { day, cnt } of dayCounts) {
       if (cnt > 0) continue
       if (newAssignments.length >= maxPerWeek) break
+      if (!dayHasRequired(day)) continue // 该天不需要值班
 
       const pool = getCandidates(null, 1)
       if (pool.length === 0) break
 
-      // 尝试从pool中找到该天有可用时段的人
+      // 尝试前3名候选人（保持原有「只试前3人」的行为）
+      const candidates = pool.slice(0, 3)
+      const dKey = dayKeyMap[day]
       let assigned = false
-      for (let pi = 0; pi < Math.min(3, pool.length); pi++) {
-        const pick = pool[pi]
-        const dKey = dayKeyMap[day]
+
+      // 第一轮：优先填 required>0 的时段
+      for (const pick of candidates) {
+        if (assigned) break
         for (let si = 0; si < 3; si++) {
           const slot = SLOTS[si]
           const sKey = SLOT_KEYS[si]
-          let required = slotConfig[`${day}_${slot}`] || 0
-          if (workdaySet.has(day)) required = Math.max(required, 1)
-          if (required > 0) {
-            // 检查课表冲突
+          if ((slotConfig[`${day}_${slot}`] || 0) <= 0) continue
+          const sc = scheduleMap[pick.id]
+          if (sc && sc[`${dKey}_${sKey}`]) continue // 该时段有课，跳过
+          assign(pick, day, slot)
+          assigned = true
+          break
+        }
+      }
+
+      // 第二轮：每日保障回退 —— 该天所有 required 时段都冲突时，
+      // 仍安排 1 人到当天第一个空闲时段，保证每天有人值班
+      if (!assigned) {
+        for (const pick of candidates) {
+          if (assigned) break
+          for (let si = 0; si < 3; si++) {
+            const slot = SLOTS[si]
+            const sKey = SLOT_KEYS[si]
             const sc = scheduleMap[pick.id]
-            if (sc && sc[`${dKey}_${sKey}`]) continue // 该时段有课，跳过
+            if (sc && sc[`${dKey}_${sKey}`]) continue
+            assign(pick, day, slot)
             assigned = true
-            thisWeekAssigned.add(pick.id)
-            roleCountThisWeek[pick.role] = (roleCountThisWeek[pick.role] || 0) + 1
-            newAssignments.push({
-              week_number: weekNumber, day_of_week: day, slot,
-              member_id: pick.id, is_emergency: false,
-              status: '正常', leave_next_week: false
-            })
-            historyCount[pick.id] = (historyCount[pick.id] || 0) + 1
             break
           }
         }
-        if (assigned) break
       }
     }
   }
@@ -267,10 +325,10 @@ export function runSchedulingAlgorithm({
     for (const { day } of dayCounts) {
       if (newAssignments.length >= maxPerWeek) break
 
+      // 只补充 required>0 且未满的时段（required=0 的时段绝不安排）
       const slotCounts = [0, 1, 2].map(si => {
         const slot = SLOTS[si]
-        let required = slotConfig[`${day}_${slot}`] || 0
-        if (workdaySet.has(day)) required = Math.max(required, 1)
+        const required = slotConfig[`${day}_${slot}`] || 0
         const already = newAssignments.filter(a => a.day_of_week === day && a.slot === slot).length
         return { si, slot, required, already, need: required - already }
       }).filter(s => s.need > 0)
@@ -289,14 +347,7 @@ export function runSchedulingAlgorithm({
 
         if (pool.length > 0) {
           const pick = pool[0]
-          thisWeekAssigned.add(pick.id)
-          roleCountThisWeek[pick.role] = (roleCountThisWeek[pick.role] || 0) + 1
-          newAssignments.push({
-            week_number: weekNumber, day_of_week: day, slot,
-            member_id: pick.id, is_emergency: false,
-            status: '正常', leave_next_week: false
-          })
-          historyCount[pick.id] = (historyCount[pick.id] || 0) + 1
+          assign(pick, day, slot)
           madeProgress = true
           break
         }
@@ -312,7 +363,9 @@ export function runSchedulingAlgorithm({
       totalMembers,
       perRoleMax: maxPerRoleThisWeek,
       perRoleUsed: roleCountThisWeek,
-      workdays
+      workdays,
+      mode: mode || '一般',
+      neededTotal
     }
   }
 }

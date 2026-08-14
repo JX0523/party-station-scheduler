@@ -116,3 +116,29 @@
 | 阶段三 | 阶段二完成后 |
 | 阶段四 | 阶段三完成后 |
 | 阶段五 | 阶段四完成后 |
+| 阶段六 | ✅ 2026-08-14 完成 |
+
+---
+
+## 阶段六：缺陷修复与功能补全（✅ 2026-08-14）
+
+**目标**：修复评审发现的缺陷，补全需求文档承诺但未实现的功能
+
+### 已完成的修复
+
+| # | 修复项 | 说明 |
+|---|--------|------|
+| 1 | 补排覆盖连续性（核心bug） | 上周请假的人即使在上周排班表中也会被优先补排；lastWeek 查询只统计 status='正常' |
+| 2 | 紧急模式落地 | 学期设置页可切换 一般/紧急；算法读取 mode，紧急模式跳过连续性约束并标记 is_emergency |
+| 3 | 时段0语义 | required=0 的时段不安排人；某天全0则不排班；每日保障回退逻辑 |
+| 4 | maxPerWeek 不再压制时段配置 | 上限 = max(配置需求总和, max(5, 总人数/2)) |
+| 5 | Dashboard 首次生成忽略调休 | 自动生成前先加载 day_config |
+| 6 | 补排标记跨周误清 | makeUpMembers 读取与标记清除都限定在上一周 |
+| 7 | assignments 唯一约束 | UNIQUE(week_number, day_of_week, slot, member_id)，防重复排班（migration-v4） |
+| 8 | Excel导入校验 | 角色合法性校验、错误提示、跳过行统计 |
+| 9 | 默认关闭公开注册 | VITE_ALLOW_REGISTRATION 控制注册入口 |
+
+### 验证标准
+- `Get-ChildItem test-*.mjs | ForEach-Object { node $_ }` 全部通过（241+11项）
+- `cd frontend && npm run build` 构建成功
+- 详细记录：`dev-logs/2026-08-14.md`、`docs/tech-spec.md` 第7节变更记录

@@ -52,24 +52,35 @@ export default function Members() {
     showToast('已删除', 'success')
   }
 
+  const VALID_ROLES = ['部员', '部长', '主席团']
+
   async function handleImport(e) {
     const file = e.target.files[0]
     if (!file) return
     const reader = new FileReader()
     reader.onload = async (ev) => {
-      const wb = XLSX.read(ev.target.result, { type: 'binary' })
-      const sheet = wb.Sheets[wb.SheetNames[0]]
-      const rows = XLSX.utils.sheet_to_json(sheet)
-      const toInsert = rows.map(r => ({
-        name: String(r['姓名'] || r['name'] || ''),
-        role: String(r['角色'] || r['role'] || '部员'),
-        phone: String(r['手机'] || r['phone'] || ''),
-        active: true
-      })).filter(r => r.name)
-      if (toInsert.length === 0) return showToast('未识别到有效数据，请检查Excel格式', 'error')
-      await supabase.from('members').insert(toInsert)
-      loadMembers()
-      showToast(`成功导入 ${toInsert.length} 人`, 'success')
+      try {
+        const wb = XLSX.read(ev.target.result, { type: 'binary' })
+        const sheet = wb.Sheets[wb.SheetNames[0]]
+        const rows = XLSX.utils.sheet_to_json(sheet)
+        const toInsert = []
+        let skipped = 0
+        for (const r of rows) {
+          const name = String(r['姓名'] || r['name'] || '').trim()
+          if (!name) continue
+          const role = String(r['角色'] || r['role'] || '部员').trim()
+          if (!VALID_ROLES.includes(role)) { skipped++; continue } // 角色无效则跳过该行
+          const phone = String(r['手机'] || r['phone'] || '').trim()
+          toInsert.push({ name, role, phone, active: true })
+        }
+        if (toInsert.length === 0) return showToast('未识别到有效数据，请检查Excel格式（角色必须是：部员/部长/主席团）', 'error')
+        const { error } = await supabase.from('members').insert(toInsert)
+        if (error) return showToast('导入失败：' + error.message, 'error')
+        loadMembers()
+        showToast('成功导入 ' + toInsert.length + ' 人' + (skipped > 0 ? '，跳过 ' + skipped + ' 行（角色无效或姓名为空）' : ''), 'success')
+      } catch (err) {
+        showToast('导入失败：' + (err.message || '文件解析错误'), 'error')
+      }
     }
     reader.readAsBinaryString(file)
   }

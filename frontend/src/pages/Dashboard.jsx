@@ -27,6 +27,22 @@ export default function Dashboard() {
 
   useEffect(() => { loadAll() }, [])
 
+  // 把 day_config 行构建成算法需要的 rich 格式（与 DaySelector 组件保持一致）
+  function buildDayConfigMap(rows) {
+    const map = {}
+    for (let d = 1; d <= 7; d++) {
+      map[d] = { isWorkday: d <= 5, substituteForOdd: null, substituteForEven: null }
+    }
+    ;(rows || []).forEach(row => {
+      map[row.day_of_week] = {
+        isWorkday: row.is_workday,
+        substituteForOdd: row.substitute_for_odd || row.substitute_for || null,
+        substituteForEven: row.substitute_for_even || row.substitute_for || null
+      }
+    })
+    return map
+  }
+
   async function loadAll() {
     const { data: sem } = await supabase.from('semester_config').select('*').limit(1).single()
     setConfig(sem)
@@ -42,6 +58,12 @@ export default function Dashboard() {
 
     if (sem) {
       const cw = sem.current_week || 1
+
+      // 先加载本周工作日/调休配置，保证首次自动生成不会忽略调休设置
+      const { data: dayRows } = await supabase.from('day_config').select('*').eq('week_number', cw)
+      const dcMap = buildDayConfigMap(dayRows)
+      setDayConfig(dcMap)
+
       // 加载本周
       const { data: curr } = await supabase.from('assignments')
         .select('*, members(name, role)')
@@ -69,14 +91,14 @@ export default function Dashboard() {
         setPastWeeks(pastList)
       }
 
-      // 本周没排班就自动生成
+      // 本周没排班就自动生成（传入刚加载好的调休配置，避免竞态）
       if (!curr || curr.length === 0) {
-        await autoGenerate(sem, scMap)
+        await autoGenerate(sem, scMap, dcMap)
       }
     }
   }
 
-  async function autoGenerate(sem, scMap) {
+  async function autoGenerate(sem, scMap, dcMap) {
     if (generatingRef.current) return  // 防止并发生成
     generatingRef.current = true
     setGenerating(true)
@@ -88,9 +110,13 @@ export default function Dashboard() {
       const { data: members } = await supabase.from('members').select('*').eq('active', true)
       const { data: schedules } = await supabase.from('course_schedules').select('*').eq('week_type', weekType)
       const { data: otherWeekSchedules } = await supabase.from('course_schedules').select('*').eq('week_type', otherWeekType)
-      const { data: lastWeek } = await supabase.from('assignments').select('member_id').eq('week_number', cw - 1)
+      // 连续性约束只看「上周正常值班」的人；请假的人上周没实际值班，不构成连续
+      const { data: lastWeek } = await supabase.from('assignments')
+        .select('member_id').eq('week_number', cw - 1).eq('status', '正常')
       const { data: allAssignments } = await supabase.from('assignments').select('member_id').eq('status', '正常')
-      const { data: makeUpMembers } = await supabase.from('assignments').select('member_id').eq('leave_next_week', true)
+      // 只补排「上周」请假的人（leave_next_week 标记只对上周生效，避免跨周误优先）
+      const { data: makeUpMembers } = await supabase.from('assignments')
+        .select('member_id').eq('leave_next_week', true).eq('week_number', cw - 1)
 
       const result = runSchedulingAlgorithm({
         members: members || [], schedules: schedules || [],
@@ -98,14 +124,18 @@ export default function Dashboard() {
         lastWeek: lastWeek || [], allAssignments: allAssignments || [],
         makeUpMembers: makeUpMembers || [],
         otherWeekSchedules: otherWeekSchedules || [],
-        dayConfig, weekType
+        dayConfig: dcMap || dayConfig, weekType,
+        mode: sem.current_mode || '一般'
       })
 
       if (result.assignments.length > 0) {
         await supabase.from('assignments').delete().eq('week_number', cw)
         await supabase.from('assignments').insert(result.assignments)
+        // 只清除「上周」的补排标记（本周已补排，不再重复优先）
         if (makeUpMembers && makeUpMembers.length > 0) {
-          await supabase.from('assignments').update({ leave_next_week: false }).eq('leave_next_week', true)
+          await supabase.from('assignments')
+            .update({ leave_next_week: false })
+            .eq('leave_next_week', true).eq('week_number', cw - 1)
         }
       }
 
@@ -213,18 +243,20 @@ export default function Dashboard() {
     const cw = config?.current_week || 1
 
     if (addMode === 'add') {
-      await supabase.from('assignments').insert({
+      const { error } = await supabase.from('assignments').insert({
         week_number: cw, day_of_week: showAdd.day, slot: showAdd.slot,
         member_id: memberId, is_emergency: false,
         status: '正常', leave_next_week: false
       })
+      if (error) return showToast('添加失败：' + error.message, 'error')
       showToast('已添加值班人员', 'success')
     } else {
-      await supabase.from('assignments').insert({
+      const { error } = await supabase.from('assignments').insert({
         week_number: showAdd.week_number, day_of_week: showAdd.day_of_week,
         slot: showAdd.slot, member_id: memberId,
         is_emergency: false, status: '正常', leave_next_week: false
       })
+      if (error) return showToast('替补安排失败：' + error.message, 'error')
       showToast('替补安排成功', 'success')
     }
     setShowAdd(null)
@@ -323,7 +355,7 @@ export default function Dashboard() {
       {/* 快捷操作 */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
         <button className="btn btn-primary" onClick={async () => {
-          if (config) { setGenerating(true); await autoGenerate(config, slotConfig) }
+          if (config) { setGenerating(true); await autoGenerate(config, slotConfig, dayConfig) }
         }} disabled={generating}>
           🔄 重新生成
         </button>
@@ -354,7 +386,7 @@ export default function Dashboard() {
           <div className="empty-state">
             <p>本周暂无排班</p>
             <button className="btn btn-primary" style={{ marginTop: 12 }}
-              onClick={async () => { if (config) { setGenerating(true); await autoGenerate(config, slotConfig) } }}>
+              onClick={async () => { if (config) { setGenerating(true); await autoGenerate(config, slotConfig, dayConfig) } }}>
               生成排班
             </button>
           </div>

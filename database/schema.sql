@@ -77,7 +77,9 @@ CREATE TABLE IF NOT EXISTS assignments (
   is_emergency      BOOLEAN DEFAULT false,
   status            TEXT DEFAULT '正常' CHECK (status IN ('正常', '请假')),
   leave_next_week   BOOLEAN DEFAULT false,
-  created_at        TIMESTAMPTZ DEFAULT now()
+  created_at        TIMESTAMPTZ DEFAULT now(),
+  -- 同一人同一周同一时段只能有一条记录，防止重复排班（2026-08-14 新增）
+  UNIQUE(week_number, day_of_week, slot, member_id)
 );
 
 -- 6. 值班统计（可选，也可通过 assignments 实时计算）

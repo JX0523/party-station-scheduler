@@ -114,9 +114,13 @@ export default function Scheduling() {
       const { data: members } = await supabase.from('members').select('*').eq('active', true)
       const { data: schedules } = await supabase.from('course_schedules').select('*').eq('week_type', weekType)
       const { data: otherWeekSchedules } = await supabase.from('course_schedules').select('*').eq('week_type', otherWeekType)
-      const { data: lastWeek } = await supabase.from('assignments').select('member_id').eq('week_number', weekNumber - 1)
+      // 连续性约束只看「上周正常值班」的人；请假的人上周没实际值班，不构成连续
+      const { data: lastWeek } = await supabase.from('assignments')
+        .select('member_id').eq('week_number', weekNumber - 1).eq('status', '正常')
       const { data: allAssignments } = await supabase.from('assignments').select('member_id').eq('status', '正常')
-      const { data: makeUpMembers } = await supabase.from('assignments').select('member_id').eq('leave_next_week', true)
+      // 只补排「上周」请假的人（leave_next_week 标记只对上周生效，避免跨周误优先）
+      const { data: makeUpMembers } = await supabase.from('assignments')
+        .select('member_id').eq('leave_next_week', true).eq('week_number', weekNumber - 1)
 
       const result = runSchedulingAlgorithm({
         members: members || [], schedules: schedules || [],
@@ -124,15 +128,19 @@ export default function Scheduling() {
         lastWeek: lastWeek || [], allAssignments: allAssignments || [],
         makeUpMembers: makeUpMembers || [],
         otherWeekSchedules: otherWeekSchedules || [],
-        dayConfig, weekType
+        dayConfig, weekType,
+        mode: semesterConfig?.current_mode || '一般'
       })
 
       await supabase.from('assignments').delete().eq('week_number', weekNumber)
       if (result.assignments.length > 0) {
         await supabase.from('assignments').insert(result.assignments)
       }
+      // 只清除「上周」的补排标记（本周已补排，不再重复优先）
       if (makeUpMembers && makeUpMembers.length > 0) {
-        await supabase.from('assignments').update({ leave_next_week: false }).eq('leave_next_week', true)
+        await supabase.from('assignments')
+          .update({ leave_next_week: false })
+          .eq('leave_next_week', true).eq('week_number', weekNumber - 1)
       }
 
       loadAssignments()
@@ -194,7 +202,7 @@ export default function Scheduling() {
 
   async function handleReplace(memberId) {
     if (!showReplace) return
-    await supabase.from('assignments').insert({
+    const { error } = await supabase.from('assignments').insert({
       week_number: showReplace.week_number,
       day_of_week: showReplace.day_of_week,
       slot: showReplace.slot,
@@ -203,6 +211,10 @@ export default function Scheduling() {
       status: '正常',
       leave_next_week: false,
     })
+    if (error) {
+      showToast('替补安排失败：' + error.message, 'error')
+      return
+    }
     setShowReplace(null)
     setCandidates([])
     loadAssignments()

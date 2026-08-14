@@ -140,13 +140,8 @@ for (let w = 1; w <= 16; w++) {
     otherWeekSchedules: otherSchedules
   })
 
-  result.assignments.forEach(a => {
-    allHistory.push({ member_id: a.member_id, week_number: w })
-  })
-  lastWeekMap.set(w, result.assignments.map(a => ({ member_id: a.member_id })))
-  makeUpPool = []
-
-  // 请假事件
+  // 请假事件（先处理：请假人本周不计入历史/上周排班，与生产查询一致——
+  // 生产代码 lastWeek/allAssignments 均过滤 status='正常'）
   let leaveInfo = ''
   if (w === 4 && result.assignments.length > 3) {
     const v = result.assignments[2]
@@ -172,6 +167,13 @@ for (let w = 1; w <= 16; w++) {
     result.assignments = result.assignments.filter(a => a.member_id !== v.member_id)
     leaveInfo = ` 🏥${vName}请假`
   }
+
+  // 只记录实际值班的人（请假已剔除），用于历史均衡与连续性检查
+  result.assignments.forEach(a => {
+    allHistory.push({ member_id: a.member_id, week_number: w })
+  })
+  lastWeekMap.set(w, result.assignments.map(a => ({ member_id: a.member_id })))
+  makeUpPool = []
 
   weekResults.push({ week: w, ...result, leaveInfo })
 

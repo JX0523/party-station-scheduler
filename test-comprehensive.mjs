@@ -430,11 +430,13 @@ console.log('\n📋 场景9: 请假补排 — 下周自动优先')
 
   const leaveId = r1.assignments[0].member_id
 
+  // 真实场景：上周的排班表里仍保留请假人的行（生产查询不过滤 status），
+  // 因此 lastWeek 必须包含请假人；补排优先级必须覆盖连续性排除才能生效。
   const r2 = runSchedulingAlgorithm({
     members, schedules: makeEmptySchedules(members, '双周'),
     slotConfig,
     weekNumber: 2,
-    lastWeek: makeLastWeek(r1.assignments.filter(a => a.member_id !== leaveId)),
+    lastWeek: makeLastWeek(r1.assignments), // 包含请假人 leaveId（上周排过班）
     allAssignments: r1.assignments.filter(a => a.member_id !== leaveId).map(a => ({ member_id: a.member_id })),
     makeUpMembers: [{ member_id: leaveId }],
     otherWeekSchedules: schedules

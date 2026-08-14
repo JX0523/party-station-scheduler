@@ -127,7 +127,9 @@ CREATE TABLE assignments (
   is_emergency      BOOLEAN DEFAULT false,
   status            TEXT DEFAULT '正常' CHECK (status IN ('正常', '请假')),
   leave_next_week   BOOLEAN DEFAULT false,
-  created_at        TIMESTAMPTZ DEFAULT now()
+  created_at        TIMESTAMPTZ DEFAULT now(),
+  -- 同一人同一周同一时段唯一，防止重复排班（2026-08-14 新增，见 migration-v4）
+  UNIQUE(week_number, day_of_week, slot, member_id)
 );
 ```
 
@@ -162,7 +164,20 @@ CREATE TABLE day_config (
 ### 4.1 排班算法
 - **文件**：`frontend/src/lib/scheduling-algorithm.js`
 - **入口**：`runSchedulingAlgorithm(params)` — 两阶段算法（Phase 1 每日覆盖 + Phase 2 轮询补充）
-- **调休映射**：`resolveScheduleKey(dayOfWeek, dayConfig)` — 根据 `substituteFor` 返回课表 key
+- **调休映射**：`resolveScheduleKey(dayOfWeek, dayConfig, weekType)` — 根据 `substituteForOdd/substituteForEven` 返回课表 key
+- **mode 参数**（2026-08-14 起支持）：
+  - `'一般'（默认）`：排除上周正常值班的人（连续性约束），避免同一人连续两周值班
+  - `'紧急'`：跳过连续性约束，允许连排；生成的排班 `is_emergency=true`（在学期设置页切换）
+- **补排优先级**（2026-08-14 修复）：`makeUpMembers`（上周请假、`leave_next_week=true`）优先级最高，
+  覆盖连续性约束——上周请假的人即使出现在 `lastWeek` 中也会被优先补排。
+  调用方（Dashboard/Scheduling）已同步修正查询：`lastWeek` 只取 `status='正常'`，
+  `makeUpMembers` 只取 `week_number = 当前周-1` 的请假记录。
+- **时段人数语义**（2026-08-14 调整）：`required_count=0` 表示该时段不需要值班，
+  绝不安排人；某天所有时段都为0则当天不排班。每日最低保障（每天至少1人）仅对
+  「至少一个时段 required>0」的工作日生效：优先填 required 时段，全部冲突时回退到
+  当天第一个空闲时段。
+- **每周总人次上限**（2026-08-14 调整）：`maxPerWeek = max(配置需求总和, max(5, 总人数/2))`，
+  保证「时段人数配置」不会被上限压制；公平性下限（半队人数）仍然防止工作量过度集中。
 
 ### 4.2 防重复生成
 - `Dashboard.jsx` 和 `Scheduling.jsx` 使用 `useRef` 互斥锁 (`generatingRef`) 防止并发生成导致重复排班
@@ -188,6 +203,32 @@ const { data, error } = await supabase
 ## 6. 安全策略
 
 - Supabase Auth 管理登录
-- RLS 策略：仅认证用户可读写
-- 管理员注册通过邀请制（首个管理员手动在Supabase后台添加）
+- RLS 策略：仅认证用户可读写（所有 authenticated 用户对全部表有增删改查权限——
+  与 PRD「单一管理员角色」设计一致）
+- 管理员账号创建方式：
+  - **默认关闭公开注册**（2026-08-14 起）：登录页不显示「注册」入口，账号由管理员在
+    Supabase 后台手动创建（与使用手册一致）
+  - 如需开放注册：在 `frontend/.env` 设置 `VITE_ALLOW_REGISTRATION=true`
 - 所有API调用自动携带JWT Token
+- ⚠️ 已知风险：anon key 是公开的；若开放注册且 Supabase 开启了邮箱确认，
+  任何能访问网址的人注册并确认后即可读写全部数据。建议保持关闭公开注册，
+  或在 Supabase 后台限制注册（Authentication → Providers → Email → 关闭 Allow new users）。
+
+---
+
+## 7. 变更记录
+
+### 2026-08-14 — 缺陷修复与功能补全（详见 dev-logs/2026-08-14.md）
+
+| # | 类型 | 改动 | 涉及文件 |
+|---|------|------|---------|
+| 1 | 修复 | 补排覆盖连续性：上周请假的人即使出现在 lastWeek 也会被优先补排（原为死代码）；调用方 lastWeek 只取 status='正常'，makeUpMembers 只取上周 | scheduling-algorithm.js / Dashboard.jsx / Scheduling.jsx |
+| 2 | 功能 | 紧急模式落地：学期设置页可切换 一般/紧急，算法读取 mode 参数，紧急模式跳过连续性约束并标记 is_emergency=true | SemesterConfig.jsx / scheduling-algorithm.js |
+| 3 | 修复 | 时段 required=0 不再被强制填1人；某天全0则不排班；每日保障回退逻辑 | scheduling-algorithm.js |
+| 4 | 修复 | maxPerWeek = max(配置需求, 公平下限)，不再压制时段人数配置 | scheduling-algorithm.js |
+| 5 | 修复 | Dashboard 首次自动生成前先加载 day_config（不再忽略调休配置） | Dashboard.jsx |
+| 6 | 修复 | 补排标记只清除/读取上周（避免跨周误优先与误清） | Dashboard.jsx / Scheduling.jsx |
+| 7 | 加固 | assignments 增加 UNIQUE(week_number, day_of_week, slot, member_id)，防重复排班；手动加人/替补失败会提示 | schema.sql / migration-v4-assignments-unique.sql / Dashboard.jsx / Scheduling.jsx |
+| 8 | 加固 | 成员Excel导入：角色校验、错误提示、跳过行统计 | Members.jsx |
+| 9 | 安全 | 登录页默认关闭公开注册（VITE_ALLOW_REGISTRATION 控制） | Login.jsx / .env.example |
+| 10 | 测试 | 新增 test-fixed-behaviors.mjs（11项回归）；更新受影响的旧测试 | test-fixed-behaviors.mjs / 各 test-*.mjs |

@@ -5,7 +5,7 @@ export default function SemesterConfig() {
   const [config, setConfig] = useState(null)
   const [form, setForm] = useState({
     name: '', first_week_is_odd: true, total_weeks: 20,
-    current_week: 1
+    current_week: 1, current_mode: '一般'
   })
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState(null)
@@ -20,7 +20,8 @@ export default function SemesterConfig() {
         name: data.name,
         first_week_is_odd: data.first_week_is_odd,
         total_weeks: data.total_weeks,
-        current_week: data.current_week || 1
+        current_week: data.current_week || 1,
+        current_mode: data.current_mode || '一般'
       })
     }
   }
@@ -81,6 +82,18 @@ export default function SemesterConfig() {
             onChange={e => setForm({ ...form, current_week: parseInt(e.target.value) || 1 })} />
           <p style={{ fontSize: 12, color: '#999', marginTop: 4 }}>
             当前周及之前的排班将被锁定，不可重新生成。每周结束后请更新当前周。
+          </p>
+        </div>
+        <div className="form-group">
+          <label className="form-label">排班模式</label>
+          <select className="form-select" value={form.current_mode}
+            onChange={e => setForm({ ...form, current_mode: e.target.value })}>
+            <option value="一般">一般模式（默认，避免同一人连续两周值班）</option>
+            <option value="紧急">紧急模式（允许连续值班，确保每天每时段都有人）</option>
+          </select>
+          <p style={{ fontSize: 12, color: '#999', marginTop: 4 }}>
+            一般模式会排除上周已值班的同学，让排班更公平；人手紧张时切换为紧急模式，
+            系统将不再限制连续值班，并在排班记录中标记 is_emergency。
           </p>
         </div>
         <div className="form-group">

@@ -70,8 +70,8 @@ export default function SlotConfig() {
       </div>
 
       <p style={{ fontSize: 14, color: '#999', marginBottom: 16 }}>
-        设置每天每个时段需要安排几名同学值班。设为0表示该时段不需要值班。
-        周六日默认不需要值班（0人），调休时可调整。
+        设置每天每个时段需要安排几名同学值班。设为0表示该时段不需要值班；
+        若某天所有时段都设为0，则当天不排班。周六日默认不需要值班（0人），调休时可调整。
       </p>
 
       <div className="card">

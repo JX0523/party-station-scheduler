@@ -9,6 +9,10 @@ export default function Login() {
   const [error, setError] = useState('')
   const [isRegister, setIsRegister] = useState(false)
 
+  // 默认关闭公开注册：账号由管理员在 Supabase 后台创建。
+  // 如需开放注册，在 frontend/.env 中设置 VITE_ALLOW_REGISTRATION=true
+  const allowRegister = import.meta.env.VITE_ALLOW_REGISTRATION === 'true'
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
@@ -79,14 +83,20 @@ export default function Login() {
           </button>
         </form>
 
-        <div className="login-footer">
-          <button
-            className="login-toggle"
-            onClick={() => { setIsRegister(!isRegister); setError('') }}
-          >
-            {isRegister ? '已有账号？去登录' : '没有账号？注册管理员'}
-          </button>
-        </div>
+        {allowRegister ? (
+          <div className="login-footer">
+            <button
+              className="login-toggle"
+              onClick={() => { setIsRegister(!isRegister); setError('') }}
+            >
+              {isRegister ? '已有账号？去登录' : '没有账号？注册管理员'}
+            </button>
+          </div>
+        ) : (
+          <div className="login-footer">
+            <span style={{ fontSize: 12, color: '#999' }}>账号由管理员创建，如无账号请联系管理员</span>
+          </div>
+        )}
       </div>
     </div>
   )

@@ -335,7 +335,7 @@ console.log('\n📋 EC-4: 课表冲突等价类')
 
 // EC-4.1: 全空闲（无课）
 console.log('  EC-4.1: 所有人无课表 -> 全部可用')
-test('10部员无课 -> 5条（maxPerWeek=floor(10/2)=5）', () => {
+test('10部员无课 -> 10条（maxPerWeek=max(需求15, 公平5)=15，不受上限压制）', () => {
   const members = makeMembers({ '部员': 10 })
   const result = runSchedulingAlgorithm({
     members,
@@ -345,8 +345,10 @@ test('10部员无课 -> 5条（maxPerWeek=floor(10/2)=5）', () => {
     makeUpMembers: [], otherWeekSchedules: [],
     dayConfig: null, weekType: '单周'
   })
-  // maxPerWeek = max(5, floor(10/2)) = 5
-  eq(result.assignments.length, 5)
+  // 默认配置周一至五每时段1人 → 需求15；公平下限 max(5, floor(10/2))=5
+  // maxPerWeek = max(15, 5) = 15，但每人每周最多1次 → 10条
+  eq(result.assignments.length, 10)
+  eq(result.meta.maxPerWeek, 15)
   // 每人最多1次
   const memberCounts = {}
   result.assignments.forEach(a => { memberCounts[a.member_id] = (memberCounts[a.member_id] || 0) + 1 })
@@ -453,8 +455,8 @@ test('周一上午required=2, 40部员 -> 安排2人', () => {
 })
 
 // EC-5.4: 全部0人
-console.log('  EC-5.4: 全部required=0 -> 仍至少每天1人（工作日保护）')
-test('全0配置工作日 -> 每天至少1人', () => {
+console.log('  EC-5.4: 全部required=0 -> 整天不排班（时段0语义：0=不需要值班）')
+test('全0配置工作日 -> 不安排任何人', () => {
   const sc = makeSlotConfig()
   for (const k in sc) sc[k] = 0
   const result = runSchedulingAlgorithm({
@@ -465,9 +467,8 @@ test('全0配置工作日 -> 每天至少1人', () => {
     makeUpMembers: [], otherWeekSchedules: [],
     dayConfig: null, weekType: '单周'
   })
-  // 工作日保护：每天至少1人
-  const days = new Set(result.assignments.map(a => a.day_of_week))
-  eq(days.size, 5, '5个工作日每天都应有人')
+  // 某天所有时段 required=0 → 当天视为不需要值班（管理员明确关闭）
+  eq(result.assignments.length, 0, '全0配置不应安排任何人')
 })
 
 // ============================================================
@@ -492,7 +493,7 @@ test('单周: 周六补周一, 双周: 无映射 -> 单周用mon_34, 双周用sa
 
   // 单周测试
   const oddResult = runSchedulingAlgorithm({
-    members, schedules: oddSchedules, slotConfig: makeSlotConfig(),
+    members, schedules: oddSchedules, slotConfig: makeSlotConfig({ '6_上午': 1, '6_下午1': 1, '6_下午2': 1 }), // 调休日需手动设置时段人数
     weekNumber: 1, lastWeek: [], allAssignments: [],
     makeUpMembers: [], otherWeekSchedules: evenSchedules,
     dayConfig: dc, weekType: '单周'
@@ -516,7 +517,7 @@ test('双周: 周六补周三, 单周: 无映射 -> 双周用wed_34', () => {
   const evenSchedules = makeSchedules(members, '双周', { 'm1_wed_34': true })
 
   const evenResult = runSchedulingAlgorithm({
-    members, schedules: evenSchedules, slotConfig: makeSlotConfig(),
+    members, schedules: evenSchedules, slotConfig: makeSlotConfig({ '6_上午': 1, '6_下午1': 1, '6_下午2': 1 }), // 调休日需手动设置时段人数
     weekNumber: 2, lastWeek: [], allAssignments: [],
     makeUpMembers: [], otherWeekSchedules: [],
     dayConfig: dc, weekType: '双周'
@@ -539,13 +540,13 @@ test('单双周都补周一 -> 都使用mon_34', () => {
   const evenSch = makeSchedules(members, '双周', { 'm1_mon_34': true })
 
   const oddResult = runSchedulingAlgorithm({
-    members, schedules: oddSch, slotConfig: makeSlotConfig(),
+    members, schedules: oddSch, slotConfig: makeSlotConfig({ '6_上午': 1, '6_下午1': 1, '6_下午2': 1 }), // 调休日需手动设置时段人数
     weekNumber: 1, lastWeek: [], allAssignments: [],
     makeUpMembers: [], otherWeekSchedules: evenSch,
     dayConfig: dc, weekType: '单周'
   })
   const evenResult = runSchedulingAlgorithm({
-    members, schedules: evenSch, slotConfig: makeSlotConfig(),
+    members, schedules: evenSch, slotConfig: makeSlotConfig({ '6_上午': 1, '6_下午1': 1, '6_下午2': 1 }), // 调休日需手动设置时段人数
     weekNumber: 2, lastWeek: [], allAssignments: [],
     makeUpMembers: [], otherWeekSchedules: oddSch,
     dayConfig: dc, weekType: '双周'
@@ -570,13 +571,13 @@ test('周六: 单周补周一, 双周补周三 -> m1单周周一有课, m1双周
   const evenSch = makeSchedules(members, '双周', {}) // m1双周完全无课
 
   const oddResult = runSchedulingAlgorithm({
-    members, schedules: oddSch, slotConfig: makeSlotConfig(),
+    members, schedules: oddSch, slotConfig: makeSlotConfig({ '6_上午': 1, '6_下午1': 1, '6_下午2': 1 }), // 调休日需手动设置时段人数
     weekNumber: 1, lastWeek: [], allAssignments: [],
     makeUpMembers: [], otherWeekSchedules: evenSch,
     dayConfig: dc, weekType: '单周'
   })
   const evenResult = runSchedulingAlgorithm({
-    members, schedules: evenSch, slotConfig: makeSlotConfig(),
+    members, schedules: evenSch, slotConfig: makeSlotConfig({ '6_上午': 1, '6_下午1': 1, '6_下午2': 1 }), // 调休日需手动设置时段人数
     weekNumber: 2, lastWeek: [], allAssignments: [],
     makeUpMembers: [], otherWeekSchedules: oddSch,
     dayConfig: dc, weekType: '双周'
