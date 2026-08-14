@@ -228,7 +228,7 @@ const { data, error } = await supabase
 | 4 | 修复 | maxPerWeek = max(配置需求, 公平下限)，不再压制时段人数配置 | scheduling-algorithm.js |
 | 5 | 修复 | Dashboard 首次自动生成前先加载 day_config（不再忽略调休配置） | Dashboard.jsx |
 | 6 | 修复 | 补排标记只清除/读取上周（避免跨周误优先与误清） | Dashboard.jsx / Scheduling.jsx |
-| 7 | 加固 | assignments 增加 UNIQUE(week_number, day_of_week, slot, member_id)，防重复排班；手动加人/替补失败会提示 | schema.sql / migration-v4-assignments-unique.sql / Dashboard.jsx / Scheduling.jsx |
+| 7 | 加固 | assignments 增加 UNIQUE(week_number, day_of_week, slot, member_id)，防重复排班；手动加人/替补失败会提示。迁移已在线上数据库执行并验证生效（2026-08-14） | schema.sql / migration-v4-assignments-unique.sql / Dashboard.jsx / Scheduling.jsx |
 | 8 | 加固 | 成员Excel导入：角色校验、错误提示、跳过行统计 | Members.jsx |
 | 9 | 安全 | 登录页默认关闭公开注册（VITE_ALLOW_REGISTRATION 控制） | Login.jsx / .env.example |
 | 10 | 测试 | 新增 test-fixed-behaviors.mjs（11项回归）；更新受影响的旧测试 | test-fixed-behaviors.mjs / 各 test-*.mjs |

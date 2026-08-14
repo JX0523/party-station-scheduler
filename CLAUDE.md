@@ -10,10 +10,13 @@
 
 | 文档 | 路径 | 说明 |
 |------|------|------|
+| 项目主页 | [README.md](README.md) | 项目简介、地址、结构、测试 |
+| 发布记录 | [CHANGELOG.md](CHANGELOG.md) | 版本变更记录（每次发布前追加） |
 | 产品需求文档 | [docs/requirements.md](docs/requirements.md) | 完整的功能需求与业务规则 |
-| 技术规范 | [docs/tech-spec.md](docs/tech-spec.md) | 技术栈、架构、数据库设计 |
+| 技术规范 | [docs/tech-spec.md](docs/tech-spec.md) | 技术栈、架构、数据库设计、变更记录 |
 | 设计规范 | [docs/design-guide.md](docs/design-guide.md) | UI设计风格、配色、组件规范 |
 | 执行计划 | [docs/execution-plan.md](docs/execution-plan.md) | 分阶段实施步骤与里程碑 |
+| Git/部署流程 | [docs/git-workflow.md](docs/git-workflow.md) | git 约定、CI/CD、回滚、数据库迁移流程 |
 
 ## 开发日志
 
