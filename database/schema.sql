@@ -165,3 +165,18 @@ INSERT INTO slot_config (day_of_week, slot, required_count) VALUES
   (6, '上午', 0), (6, '下午1', 0), (6, '下午2', 0),
   (7, '上午', 0), (7, '下午1', 0), (7, '下午2', 0)
 ON CONFLICT (day_of_week, slot) DO NOTHING;
+
+-- =============================================
+-- 8. 保活心跳表（v5 迁移，2026-08-21）
+-- GitHub Actions 每天 INSERT 一行，防止免费项目被暂停
+-- =============================================
+CREATE TABLE IF NOT EXISTS keep_alive_pings (
+  id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  pinged_at  TIMESTAMPTZ DEFAULT now(),
+  source     TEXT DEFAULT 'github-actions'
+);
+
+ALTER TABLE keep_alive_pings ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "允许匿名插入心跳" ON keep_alive_pings FOR INSERT TO anon WITH CHECK (true);
+CREATE POLICY "允许匿名删除心跳" ON keep_alive_pings FOR DELETE TO anon USING (true);

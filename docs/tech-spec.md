@@ -218,6 +218,12 @@ const { data, error } = await supabase
 
 ## 7. 变更记录
 
+### 2026-08-21 — Supabase 保活机制升级（详见 dev-logs/2026-08-21.md）
+
+| # | 类型 | 改动 | 涉及文件 |
+|---|------|------|---------|
+| 1 | 运维 | 新增 keep_alive_pings 心跳表：保活从「每周2次 SELECT」升级为「每天1次 INSERT 真实写操作」。SELECT 可能命中缓存不计入 Supabase 活动检测，INSERT 无法被缓存绕过。迁移需在 SQL Editor 手动执行 | schema.sql / migration-v5-keepalive.sql / keep-alive.yml |
+
 ### 2026-08-14 — 缺陷修复与功能补全（详见 dev-logs/2026-08-14.md）
 
 | # | 类型 | 改动 | 涉及文件 |

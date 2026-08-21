@@ -1,19 +1,19 @@
 name: Keep Supabase Alive
 
-# 每3天自动 ping 一次，防止免费项目因7天不活跃被暂停
-# 每周日 + 周三 UTC 03:07 — 两次间隔不超过4天，远低于7天阈值
+# 每天 UTC 03:17 自动执行一次真实数据库写操作（INSERT），防止免费项目因7天不活跃被暂停
+# 为什么是 INSERT 而不是 SELECT：Supabase 的不活跃检测基于数据库活动，
+#   SELECT 可能命中缓存不计入；INSERT 是无法被缓存绕过的真实写事务（2026-08-21 升级）
 # 也支持手动触发（Actions 面板 → Keep Supabase Alive → Run workflow）
 on:
   schedule:
-    - cron: '7 3 * * 0'  # 每周日 UTC 03:07（北京时间周日上午11:07）
-    - cron: '7 3 * * 3'  # 每周三 UTC 03:07（北京时间周三上午11:07）
+    - cron: '17 3 * * *'  # 每天 UTC 03:17（避开整点高峰，北京时间上午11:17）
   workflow_dispatch:
 
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Supabase (prevent auto-pause)
+      - name: INSERT heartbeat + cleanup (prevent auto-pause)
         run: |
           set -euo pipefail
 
@@ -30,19 +30,36 @@ jobs:
           # 去掉 URL 末尾的斜杠，避免出现双斜杠 /rest/...
           SUPA_URL="${SUPABASE_URL%/}"
 
-          echo "→ Pinging ${SUPA_URL} ..."
-          HTTP_CODE=$(curl -w "%{http_code}" \
+          # 1) INSERT 一条心跳记录 — 真实数据库写操作，可靠重置不活跃计时器
+          echo "→ INSERT heartbeat into keep_alive_pings ..."
+          INSERT_CODE=$(curl -w "%{http_code}" \
             --max-time 30 \
             --retry 2 \
-            -X GET \
-            "${SUPA_URL}/rest/v1/members?select=id&limit=1" \
+            -X POST \
+            "${SUPA_URL}/rest/v1/keep_alive_pings" \
+            -H "apikey: ${SUPABASE_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_KEY}" \
+            -H "Content-Type: application/json" \
+            -d '{"source":"github-actions"}' \
+            -o /dev/null)
+
+          if [ "$INSERT_CODE" != "201" ]; then
+            echo "::error::心跳 INSERT 失败 HTTP ${INSERT_CODE}"
+            echo "请确认 keep_alive_pings 表已创建：Supabase Dashboard → SQL Editor → 执行 database/migration-v5-keepalive.sql"
+            exit 1
+          fi
+          echo "✅ INSERT OK (HTTP 201) — 不活跃计时器已重置"
+
+          # 2) 清理 30 天前的旧心跳，防止表无限增长
+          CUTOFF=$(date -u -d "30 days ago" +%Y-%m-%d)
+          echo "→ Cleaning heartbeats older than ${CUTOFF} ..."
+          DELETE_CODE=$(curl -w "%{http_code}" \
+            --max-time 30 \
+            --retry 2 \
+            -X DELETE \
+            "${SUPA_URL}/rest/v1/keep_alive_pings?pinged_at=lt.${CUTOFF}" \
             -H "apikey: ${SUPABASE_KEY}" \
             -H "Authorization: Bearer ${SUPABASE_KEY}" \
             -o /dev/null)
 
-          if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "401" ]; then
-            echo "✅ Supabase ping OK (HTTP ${HTTP_CODE}) — 不活跃计时器已重置"
-          else
-            echo "::error::Supabase 返回 HTTP ${HTTP_CODE}，请检查 Secrets 配置"
-            exit 1
-          fi
+          echo "✅ Cleanup done (HTTP ${DELETE_CODE})"

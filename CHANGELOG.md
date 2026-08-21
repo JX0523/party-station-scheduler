@@ -7,6 +7,23 @@
 
 ---
 
+## [2026-08-21] — Supabase 保活机制升级
+
+### 修复
+- **免费项目仍被标记「低活跃度」**（核心）：保活 ping 由每周 2 次 SELECT 改为
+  **每天 1 次 INSERT 真实写操作**——SELECT 可能命中缓存不计入 Supabase 的活动检测，
+  INSERT 是无法被缓存绕过的数据库写事务
+- **心跳表无限增长**：新增 30 天自动清理（DELETE 旧心跳行）
+
+### 变更
+- 新增 `keep_alive_pings` 心跳表（[migration-v5-keepalive.sql](database/migration-v5-keepalive.sql)，
+  需在 Supabase SQL Editor 手动执行）
+
+### 文档
+- tech-spec.md 第 7 节登记变更；新增 dev-logs/2026-08-21.md
+
+---
+
 ## [2026-08-14] — 缺陷修复与功能补全（commit d6c3a41）
 
 这是第一次正式记录的发布。此前项目通过 git 持续开发但未维护 CHANGELOG。
