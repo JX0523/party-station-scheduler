@@ -4,7 +4,6 @@ import { runSchedulingAlgorithm, resolveScheduleKey } from '../lib/scheduling-al
 import DaySelector from '../components/DaySelector.jsx'
 
 const ALL_DAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
-const ALL_DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
 const SLOTS = ['上午', '下午1', '下午2']
 const SLOT_KEYS = ['34', '67', '89']
 
