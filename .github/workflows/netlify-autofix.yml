@@ -40,6 +40,11 @@ jobs:
           else
             echo "✅ 无需处理（provider=$PROVIDER stop_builds=$STOP）" | tee -a "$GITHUB_STEP_SUMMARY"
           fi
-      - name: Show deploy summary
+      - name: Report result to GitHub Issue (public, readable without login)
         if: always()
-        run: echo "本工作流不构建前端，不消耗 Netlify 积分"
+        continue-on-error: true
+        env:
+          GH_TOKEN: \${ github.token }
+        run: |
+          SUMMARY=$(cat "$GITHUB_STEP_SUMMARY" 2>/dev/null | head -c 3000)
+          gh issue create --title "Netlify 自动修复结果 $(date -u +%F)" --body "$SUMMARY" || echo "issue creation skipped (no permission)"
