@@ -1,0 +1,45 @@
+# Netlify 自动修复：诊断并关闭 Netlify 自身的 GitHub 自动构建（2026-08-21）
+# 背景：Netlify 免费额度每月 300 构建积分，若 Netlify 后台连了 GitHub 自动构建，
+#       每次 push 都会额外触发一次 Netlify 构建（和 GitHub Actions 重复、双倍烧积分）。
+# 本工作流：
+#   1. 读取 Netlify 站点配置（build_settings）
+#   2. 若发现连接了 GitHub 自动构建且未停用 → 调用 Netlify API 设置 stop_builds=true（即 UI 上的 Stop auto deploys）
+#   3. 结果写入 Job summary（Actions 运行页可查看）
+# 触发方式：本文件变更时自动运行一次，或手动 Actions → Netlify Auto-Fix → Run workflow
+# 安全：只读站点配置 + 修改 stop_builds（可逆）；令牌来自仓库 Secrets，不会打印
+name: Netlify Auto-Fix (stop auto-build)
+on:
+  push:
+    paths:
+      - '.github/workflows/netlify-autofix.yml'
+  workflow_dispatch:
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Diagnose + disable Netlify auto-build
+        env:
+          NETLIFY_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE: ${{ secrets.NETLIFY_SITE_ID }}
+        run: |
+          set -euo pipefail
+          echo "## Netlify 诊断与修复结果" >> "$GITHUB_STEP_SUMMARY"
+          INFO=$(curl -sf --max-time 30 -H "Authorization: Bearer ${NETLIFY_TOKEN}" "https://api.netlify.com/api/v1/sites/${NETLIFY_SITE}")
+          echo "$INFO" | jq '{name, url, build_settings}' | tee -a "$GITHUB_STEP_SUMMARY"
+          PROVIDER=$(echo "$INFO" | jq -r '.build_settings.provider // "manual"')
+          REPO=$(echo "$INFO" | jq -r '.build_settings.repo_url // ""')
+          STOP=$(echo "$INFO" | jq -r '.build_settings.stop_builds // false')
+          echo "provider=$PROVIDER repo=$REPO stop_builds=$STOP"
+          if [ "$PROVIDER" != "manual" ] && [ -n "$REPO" ] && [ "$STOP" != "true" ]; then
+            echo "检测到 Netlify GitHub 自动构建，正在关闭..."
+            curl -sf --max-time 30 -X PUT -H "Authorization: Bearer ${NETLIFY_TOKEN}" -H "Content-Type: application/json" \
+              -d '{"build_settings":{"stop_builds":true}}' \
+              "https://api.netlify.com/api/v1/sites/${NETLIFY_SITE}" > /dev/null
+            echo "✅ 已关闭自动构建 (stop_builds=true)" | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "✅ 无需处理（provider=$PROVIDER stop_builds=$STOP）" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Show deploy summary
+        if: always()
+        run: echo "本工作流不构建前端，不消耗 Netlify 积分"
