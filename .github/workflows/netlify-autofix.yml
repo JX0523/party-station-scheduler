@@ -1,54 +1,47 @@
-# Netlify 自动修复：把站点切换为「手动部署」模式（2026-08-21 v2）
-# 背景：Netlify 免费额度每月 300 构建积分。若 Netlify 连了 GitHub 自动构建，
-#       每次 push 都会额外构建一次（与 GitHub Actions 重复、双倍烧积分）。
-# v1 教训：单纯 stop_builds=true 会让 Netlify 拒绝 API 部署（HTTP 403 Forbidden），
-#       导致 GitHub Actions 部署失败。
-# v2 方案：断开 GitHub 连接（provider=manual）+ 恢复构建接受 API 部署——
-#       GitHub 推送不再触发 Netlify 自动构建（积分安全），同时 Actions 的 API 上传照常工作。
+# Netlify 自动修复 v3（2026-08-21）
+# 诊断结论（netlify-deploy-diag 实测）：
+#   - 部署被拒的真实原因：账号积分超限（Account credit usage exceeded，HTTP 403），
+#     与 stop_builds 无关——Netlify 在积分用尽时封禁所有新部署（含 API 上传），8/25 重置后自动恢复
+#   - 积分超限的元凶：Netlify 连了 GitHub 自动构建（provider=github + build 命令），每次 push 双倍构建
+#   - 手动模式（provider=manual）无法通过 API 的部分 PUT 生效，故采用已验证可靠的 stop_builds=true
 # 本工作流：
-#   1. 读取 Netlify 站点配置（build_settings）
-#   2. 若非手动模式 → 调用 Netlify API 切换为 provider=manual（等效 UI 的断开 GitHub 连接）
-#   3. 结果写入 Job summary（Actions 运行页可查看）
-# 触发方式：本文件变更时自动运行一次，或手动 Actions → Netlify Auto-Fix → Run workflow
-# 安全：只读站点配置 + 修改 build_settings（可逆）；令牌来自仓库 Secrets，不会打印
+#   1. 读取站点 build_settings
+#   2. 若非停止状态 → 设 stop_builds=true（等效 UI 的 Stop builds，已验证生效且不阻止 API 部署）
+#   3. 把前后配置写回仓库 netlify-autofix-report.txt（便于无登录核验）
+# 触发：本文件变更自动运行一次；也可 Actions → Netlify Auto-Fix → Run workflow
 name: Netlify Auto-Fix (stop auto-build)
 on:
   push:
     paths:
       - '.github/workflows/netlify-autofix.yml'
   workflow_dispatch:
-
 jobs:
   fix:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - name: Diagnose + disable Netlify auto-build
+      - uses: actions/checkout@v4
+      - name: Stop Netlify auto-builds + report back
         env:
           NETLIFY_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE: ${{ secrets.NETLIFY_SITE_ID }}
         run: |
           set -euo pipefail
-          echo "## Netlify 诊断与修复结果" >> "$GITHUB_STEP_SUMMARY"
-          INFO=$(curl -sf --max-time 30 -H "Authorization: Bearer ${NETLIFY_TOKEN}" "https://api.netlify.com/api/v1/sites/${NETLIFY_SITE}")
-          echo "$INFO" | jq '{name, url, build_settings}' | tee -a "$GITHUB_STEP_SUMMARY"
-          PROVIDER=$(echo "$INFO" | jq -r '.build_settings.provider // "manual"')
-          REPO=$(echo "$INFO" | jq -r '.build_settings.repo_url // ""')
-          STOP=$(echo "$INFO" | jq -r '.build_settings.stop_builds // false')
-          echo "provider=$PROVIDER repo=$REPO stop_builds=$STOP"
-          if [ "$PROVIDER" != "manual" ]; then
-            echo "检测到 Netlify 连接了 Git 自动构建（provider=$PROVIDER），切换到手动部署模式..."
+          {
+            echo '=== BEFORE ==='
+            curl -sf --max-time 30 -H "Authorization: Bearer ${NETLIFY_TOKEN}" "https://api.netlify.com/api/v1/sites/${NETLIFY_SITE}" | jq '.build_settings | {provider, repo_url, stop_builds, cmd, base}'
+            echo ''
+            echo '=== APPLY stop_builds=true ==='
             curl -sf --max-time 30 -X PUT -H "Authorization: Bearer ${NETLIFY_TOKEN}" -H "Content-Type: application/json" \
-              -d '{"build_settings":{"provider":"manual","repo_url":"","stop_builds":false}}' \
-              "https://api.netlify.com/api/v1/sites/${NETLIFY_SITE}" > /dev/null
-            echo "✅ 已切换为手动部署模式 (provider=manual, stop_builds=false)" | tee -a "$GITHUB_STEP_SUMMARY"
-          else
-            echo "✅ 已是手动部署模式（provider=$PROVIDER stop_builds=$STOP），无需处理" | tee -a "$GITHUB_STEP_SUMMARY"
-          fi
-      - name: Report result to GitHub Issue (public, readable without login)
-        if: always()
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          SUMMARY=$(cat "$GITHUB_STEP_SUMMARY" 2>/dev/null | head -c 3000)
-          gh issue create --title "Netlify 自动修复结果 $(date -u +%F)" --body "$SUMMARY" || echo "issue creation skipped (no permission)"
+              -d '{"build_settings":{"stop_builds":true}}' \
+              "https://api.netlify.com/api/v1/sites/${NETLIFY_SITE}" > /dev/null && echo 'PUT OK'
+            echo ''
+            echo '=== AFTER ==='
+            curl -sf --max-time 30 -H "Authorization: Bearer ${NETLIFY_TOKEN}" "https://api.netlify.com/api/v1/sites/${NETLIFY_SITE}" | jq '.build_settings | {provider, repo_url, stop_builds, cmd, base}'
+          } > netlify-autofix-report.txt 2>&1
+          git config user.name 'autofix-bot'
+          git config user.email 'autofix-bot@users.noreply.github.com'
+          git add netlify-autofix-report.txt
+          git commit -m 'autofix: netlify stop_builds report' || echo 'nothing to commit'
+          git push origin master || echo 'PUSH_BACK_FAILED'
