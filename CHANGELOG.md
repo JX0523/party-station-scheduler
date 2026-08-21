@@ -72,3 +72,11 @@
   GitHub 自动构建（stop_builds=true，已生效）；网站更新仍由 GitHub Actions 免费完成
 - **变更**：frontend/index.html 增加 description meta
 - **流程**：确立「每次操作后：检查→写文档→上传→验证」标准流程（见 CLAUDE.md）
+## [2026-08-21] — Netlify 部署 403 真相与最终修复（追加2）
+
+- **真相**：部署 403 的根因是 **Netlify 积分超限**（300/月 用尽，`Account credit usage exceeded`），
+  非配置问题；Netlify 在积分用尽时封禁一切新部署，8/25 周期重置后自动恢复
+- **修复**：netlify-autofix.yml v3 将站点恢复为 stop_builds=true（自动构建停止），
+  并留档 netlify-autofix-report.txt（前后配置对比）
+- **影响**：8/25 前 Netlify 无法接收新部署（GitHub Pages 不受影响，正常更新）；
+  8/25 后 GitHub Actions 部署自动恢复
