@@ -44,7 +44,7 @@ jobs:
         if: always()
         continue-on-error: true
         env:
-          GH_TOKEN: \${ github.token }
+          GH_TOKEN: ${{ github.token }}
         run: |
           SUMMARY=$(cat "$GITHUB_STEP_SUMMARY" 2>/dev/null | head -c 3000)
           gh issue create --title "Netlify 自动修复结果 $(date -u +%F)" --body "$SUMMARY" || echo "issue creation skipped (no permission)"
