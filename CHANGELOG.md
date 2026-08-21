@@ -64,3 +64,11 @@
 
 项目初始开发（React + Vite + Supabase），从零搭建到 6 大功能模块 + 241 项测试 + 双平台部署。
 历史提交记录见 git log（commit 9006ca0、1bac605、7fa88d7 等）。
+## [2026-08-21] — Netlify 构建积分优化 + 部署流水线加固（追加）
+
+- **修复**：Netlify 免费额度（300 构建积分/月）使用达 75%——部署工作流加 paths 过滤，
+  只有前端代码变更才触发部署（纯文档/测试/日志提交零消耗）
+- **加固**：新增 netlify-autofix.yml 工作流，自动调用 Netlify API 关闭 Netlify 自身的
+  GitHub 自动构建（stop_builds=true，已生效）；网站更新仍由 GitHub Actions 免费完成
+- **变更**：frontend/index.html 增加 description meta
+- **流程**：确立「每次操作后：检查→写文档→上传→验证」标准流程（见 CLAUDE.md）

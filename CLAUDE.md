@@ -30,6 +30,33 @@
 4. **每日收尾**：更新 `dev-logs/` 中当天的日志文件
 5. **分步推进**：每个阶段完成后暂停，确认无误再进行下一阶段
 
+## ⭐ 每次操作完成后的标准流程（必须执行，无需用户提醒）
+
+> 2026-08-21 由用户明确要求：任何一次改动/操作完成后，都自动走完下面四步，不要等用户重复交代。
+
+1. **检查**：跑全部测试 + 构建 + 静态检查
+   - `Get-ChildItem test-*.mjs | ForEach-Object { node $_ }`（7 个套件，254 项，必须全绿）
+   - `cd frontend && npm run build`（构建必须成功）
+   - 改动文件新增的 lint 问题必须清零
+   - ⚠️ **存量 lint 问题（改动前就存在，勿在非相关改动中顺手处理）**：
+     App.jsx（useContext 未使用、context 未拆分文件）、DaySelector.jsx/Stats.jsx（函数提升模式）、
+     vite.config.js（mode/process）、Dashboard.jsx/Scheduling.jsx 的 `loadAll` 提升模式。
+     这些是历史代码风格，与功能无关；若专门做 lint 清理另开一个提交。
+2. **写文档**：把这次操作记下来，让别人（人和 AI）都能看懂
+   - 追加当日 `dev-logs/YYYY-MM-DD.md`（改了什么、为什么、验证结果）
+   - 功能/行为变化 → 更新 `docs/requirements.md` 或 `docs/tech-spec.md` 的变更记录
+   - 涉及发布 → 在 `CHANGELOG.md` 追加条目
+   - 涉及流程约定 → 更新本文档（CLAUDE.md）
+3. **上传**：`git add -A && git commit -m "类型+主题" && git push origin master`
+   - 注意：纯文档/测试/数据库脚本提交不会触发部署（deploy.yml 有 paths 过滤，正常）
+   - 前端代码变更会触发 GitHub Actions 自动部署
+4. **验证**：确认线上生效
+   - 检查最新 Deploy 运行结论（GitHub API：`status=completed` 且 `conclusion=success`）
+   - 两个网站 HTTP 200：Netlify + GitHub Pages
+   - 前端变更时确认部署产物更新（index.html 里的 assets hash 变化）
+
+**例外**：如果用户只是问问题/查资料（不产生改动），不需要走第 2~4 步，正常回答即可。
+
 ## 项目结构
 
 ```
