@@ -1,8 +1,14 @@
 name: Deploy (GitHub Pages + Netlify)
 
+# 只在「前端代码或工作流本身」变更时才部署（2026-08-21 优化，省 Netlify 构建积分）：
+# - 纯文档/测试/数据库脚本提交 → 跳过部署，不烧积分
+# - 需要手动部署时：仓库 Actions 页 → Deploy → Run workflow
 on:
   push:
     branches: [master]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/deploy.yml'
   workflow_dispatch:
 
 jobs:
