@@ -43,7 +43,7 @@
 ├── dev-logs/                 # 开发日志（YYYY-MM-DD.md）
 ├── .github/workflows/        # CI/CD
 │   ├── deploy.yml            # GitHub Pages + Netlify 双部署
-│   └── keep-alive.yml        # Supabase 保活（每周2次ping，防止免费项目被暂停）
+│   └── keep-alive.yml        # Supabase 保活（每天1次INSERT心跳，防止免费项目被暂停）
 ├── frontend/                 # React前端项目
 │   ├── src/
 │   │   ├── components/       # 可复用组件（Navbar, Layout, DaySelector）
@@ -66,6 +66,7 @@
 │   ├── migration-dayoff-v2.sql # 调休课表映射迁移v2
 │   ├── migration-dayoff-v3.sql # 单双周独立课表映射迁移v3
 │   └── migration-v4-assignments-unique.sql # 排班唯一约束迁移v4（2026-08-14）
+│   └── migration-v5-keepalive.sql # 保活心跳表迁移v5（2026-08-21，已在线上执行）
 ├── test-algorithm.mjs           # 算法单元测试（27项）
 ├── test-phase1-fix.mjs          # 课表冲突+调休测试（34项）
 ├── test-comprehensive.mjs       # 综合场景测试（49项）

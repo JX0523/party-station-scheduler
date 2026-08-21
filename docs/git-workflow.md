@@ -38,8 +38,9 @@ git push origin master        # 3. 推送（自动触发部署）
 | deploy-github-pages | `npm ci` + `npm run build`（base=/party-station-scheduler/）+ 上传 Pages artifact + 部署 | https://JX0523.github.io/party-station-scheduler/ |
 | deploy-netlify | `npm ci` + `npm run build`（base=/）+ 复制 netlify.toml + 部署 | https://creative-brioche-5681d2.netlify.app |
 
-另有 `.github/workflows/keep-alive.yml`：每周三、周日自动 ping 一次 Supabase REST 接口，
-防止免费项目因 7 天不活跃被暂停（项目曾因此被暂停过一次，见 dev-logs/2026-08-10.md）。
+另有 `.github/workflows/keep-alive.yml`：每天自动向 `keep_alive_pings` 心跳表 INSERT 一次（真实写操作），
+防止免费项目因 7 天不活跃被暂停。曾因「SELECT 查询不计入活动检测」被警告过两次，
+故 v5 起改为 INSERT（见 dev-logs/2026-08-10.md 与 dev-logs/2026-08-21.md）。
 
 ### 部署需要的 Secrets（仓库 Settings → Secrets and variables → Actions）
 
