@@ -1,0 +1,20 @@
+=== BEFORE ===
+{
+  "provider": "github",
+  "repo_url": "https://github.com/JX0523/party-station-scheduler",
+  "stop_builds": false,
+  "cmd": "npm run build",
+  "base": "frontend"
+}
+
+=== APPLY stop_builds=true ===
+PUT OK
+
+=== AFTER ===
+{
+  "provider": "github",
+  "repo_url": "https://github.com/JX0523/party-station-scheduler",
+  "stop_builds": true,
+  "cmd": "npm run build",
+  "base": "frontend"
+}
