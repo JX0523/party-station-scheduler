@@ -131,8 +131,9 @@ export default function Scheduling() {
         mode: semesterConfig?.current_mode || '一般'
       })
 
-      await supabase.from('assignments').delete().eq('week_number', weekNumber)
+      // 有结果才先删后插；算法返回 0 条时（如全员课表冲突）保留原排班，避免误清空
       if (result.assignments.length > 0) {
+        await supabase.from('assignments').delete().eq('week_number', weekNumber)
         await supabase.from('assignments').insert(result.assignments)
       }
       // 只清除「上周」的补排标记（本周已补排，不再重复优先）
