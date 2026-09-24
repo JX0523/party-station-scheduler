@@ -100,6 +100,7 @@
 │   ├── migration-dayoff-v3.sql # 单双周独立课表映射迁移v3
 │   └── migration-v4-assignments-unique.sql # 排班唯一约束迁移v4（2026-08-14）
 │   └── migration-v5-keepalive.sql # 保活心跳表迁移v5（2026-08-21，已在线上执行）
+│   └── migration-v6-data-api-grants.sql # Data API 显式授权v6（2026-09-24）
 ├── test-algorithm.mjs           # 算法单元测试（27项）
 ├── test-phase1-fix.mjs          # 课表冲突+调休测试（34项）
 ├── test-comprehensive.mjs       # 综合场景测试（49项）
@@ -124,10 +125,21 @@
    手动加人/替补插入失败会弹出错误提示（不要绕过约束）。
 7. **数据库变更流程**：先在 `database/schema.sql` 更新建表语句，再写一个 `migration-vX-*.sql`，
    并在 tech-spec.md 第7节变更记录中登记。已有数据库需要手动在 Supabase SQL Editor 执行迁移。
-8. **环境变量**：`VITE_SUPABASE_URL`、`VITE_SUPABASE_ANON_KEY` 必填；
+8. **⚠️ 新建表必须带 GRANT（2026-10-30 起强制）**：Supabase 自 2026-10-30 起不再自动为 public schema
+   的新表授予 Data API 权限。**任何新建表的迁移，必须在同一个文件里补上授权**，否则前端调用会报
+   `permission denied for table xxx`（错误码 42501）：
+   ```sql
+   GRANT SELECT, INSERT, UPDATE, DELETE ON public.新表名 TO authenticated;
+   GRANT SELECT, INSERT, UPDATE, DELETE ON public.新表名 TO service_role;
+   -- 若该表需要匿名访问（如保活心跳表）再加：
+   GRANT SELECT, INSERT, DELETE ON public.新表名 TO anon;
+   ```
+   现有 8 张表已显式授权（见 schema.sql 第 9 节与 migration-v6），不受影响。
+   完整模板见 `database/migration-v6-data-api-grants.sql` 末尾注释。
+9. **环境变量**：`VITE_SUPABASE_URL`、`VITE_SUPABASE_ANON_KEY` 必填；
    `VITE_ALLOW_REGISTRATION=true` 才显示登录页注册入口（默认关闭）；
    `VITE_BASE` 用于 GitHub Pages 子路径部署。CI secrets 与 `frontend/.env` 保持一致。
-9. **测试全部通过**：`Get-ChildItem test-*.mjs | ForEach-Object { node $_ }`（241+11项）。
+10. **测试全部通过**：`Get-ChildItem test-*.mjs | ForEach-Object { node $_ }`（254项，7个套件）。
    新增行为必须补测试（参考 test-fixed-behaviors.mjs 的风格）。
 
 ## 快速命令

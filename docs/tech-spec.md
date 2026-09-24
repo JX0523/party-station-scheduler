@@ -159,6 +159,25 @@ CREATE TABLE day_config (
 
 `substitute_for` 用于调休课表映射：周六补周一的课 → `substitute_for = 1`，算法会用 `mon_*` 而非 `sat_*` 检查课表冲突。
 
+### 3.8 Data API 授权（GRANT）— 2026-09-24 新增
+
+**Supabase 政策变更**：自 **2026-10-30** 起，`public` schema 中**新建的表**不再自动获得 Data API 访问权限。
+
+| 范围 | 影响 |
+|------|------|
+| 本项目现有 8 张表 | ✅ 不受影响，保留原有授权（members / course_schedules / semester_config / slot_config / assignments / duty_stats / day_config / keep_alive_pings） |
+| 2026-10-30 之后新建的表 | ⚠️ 必须在建表迁移中显式 `GRANT`，否则 supabase-js / PostgREST 访问返回 `permission denied for table xxx`（SQLSTATE **42501**） |
+| 新建库 / 本地 `supabase db reset` / preview 分支 | 同样需要显式授权 |
+
+**本项目的处理**：
+1. `database/schema.sql` 第 9 节：为全部 8 张表补上显式 GRANT（新建库时开箱可用）
+2. `database/migration-v6-data-api-grants.sql`：幂等授权脚本（可选在 Supabase SQL Editor 执行一次；
+   现有表本就已授权，执行只是"显式化"），文件末尾附**新增表模板**
+3. 授权口径（最小权限）：
+   - 业务表：`authenticated` / `service_role` 可增删改查；**不给 `anon` 权限**（未登录不可读写）
+   - `keep_alive_pings`（保活心跳）：额外给 `anon` 的 `SELECT/INSERT/DELETE`，供 GitHub Actions 用公开密钥保活
+4. 约定已写入 `CLAUDE.md` 第 8 条：**新表迁移必须带 GRANT**
+
 ## 4. 前端架构要点
 
 ### 4.1 排班算法
@@ -238,3 +257,12 @@ const { data, error } = await supabase
 | 8 | 加固 | 成员Excel导入：角色校验、错误提示、跳过行统计 | Members.jsx |
 | 9 | 安全 | 登录页默认关闭公开注册（VITE_ALLOW_REGISTRATION 控制） | Login.jsx / .env.example |
 | 10 | 测试 | 新增 test-fixed-behaviors.mjs（11项回归）；更新受影响的旧测试 | test-fixed-behaviors.mjs / 各 test-*.mjs |
+
+### 2026-09-24 — Supabase Data API 授权政策应对（详见 dev-logs/2026-09-24.md）
+
+| # | 类型 | 改动 | 涉及文件 |
+|---|------|------|---------|
+| 1 | 加固 | `schema.sql` 新增第 9 节：为全部 8 张表补显式 GRANT（应对 2026-10-30 起新表不再自动授权的政策） | database/schema.sql |
+| 2 | 加固 | 新增幂等授权迁移（含"新增表模板"注释），可在 SQL Editor 执行一次使授权显式化 | database/migration-v6-data-api-grants.sql |
+| 3 | 文档 | CLAUDE.md 新增第 8 条硬性约定：**新表迁移必须带 GRANT**；结构树补 v5/v6 迁移 | CLAUDE.md |
+| 4 | 文档 | 技术规范新增 3.8 节：政策说明、影响范围、最小权限口径 | docs/tech-spec.md |

@@ -180,3 +180,40 @@ ALTER TABLE keep_alive_pings ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "允许匿名插入心跳" ON keep_alive_pings FOR INSERT TO anon WITH CHECK (true);
 CREATE POLICY "允许匿名删除心跳" ON keep_alive_pings FOR DELETE TO anon USING (true);
+
+-- =============================================
+-- 9. Data API 授权（GRANT）— 2026-09-24 新增
+-- =============================================
+-- 背景：Supabase 公告，自 2026-10-30 起，public schema 中【新建的表】不再自动获得
+--       Data API 访问权限；必须在建表迁移里显式 GRANT，否则 supabase-js / PostgREST
+--       访问会报 permission denied（42501）。
+--       现有表不受影响（保留原有授权），但为了让本文件在「新建库 / 本地 db reset /
+--       preview 分支」等场景下依然开箱可用，这里统一显式授权。
+-- 约定：以后新增任何表，必须在同一个迁移文件里补上对应的 GRANT（见 CLAUDE.md）。
+-- =============================================
+
+-- 业务表：认证用户可读写；匿名（未登录）仅需读取公开数据时开放 select（此处按最小权限，匿名不给业务表权限）
+GRANT SELECT, INSERT, UPDATE, DELETE ON
+  public.members,
+  public.course_schedules,
+  public.semester_config,
+  public.slot_config,
+  public.assignments,
+  public.duty_stats,
+  public.day_config
+TO authenticated;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON
+  public.members,
+  public.course_schedules,
+  public.semester_config,
+  public.slot_config,
+  public.assignments,
+  public.duty_stats,
+  public.day_config
+TO service_role;
+
+-- 保活心跳表：keep-alive workflow 用匿名密钥 INSERT/DELETE（表内无敏感数据）
+GRANT SELECT, INSERT, DELETE ON public.keep_alive_pings TO anon;
+GRANT SELECT, INSERT, DELETE ON public.keep_alive_pings TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.keep_alive_pings TO service_role;

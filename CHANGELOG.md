@@ -7,6 +7,25 @@
 
 ---
 
+## [2026-09-24] — 应对 Supabase Data API 授权政策变更（2026-10-30 生效）
+
+### 加固
+- **新建表将不再自动获得 Data API 权限**（Supabase 官方政策，2026-10-30 起生效）：
+  `database/schema.sql` 新增第 9 节，为现有 8 张表补齐显式 `GRANT`；业务表仅授权
+  `authenticated`/`service_role`（匿名不可读写），`keep_alive_pings` 额外授权 `anon` 供保活使用
+- 新增 `database/migration-v6-data-api-grants.sql`：幂等授权脚本 + 新增表模板 + 授权验证 SQL，
+  可在 Supabase SQL Editor 执行一次使授权显式化（现有表本就已授权，属可选加固）
+
+### 文档
+- `CLAUDE.md` 新增第 8 条硬性约定：**任何新建表的迁移必须同时写 GRANT**（附示例），
+  否则前端会报 `permission denied for table xxx`（SQLSTATE 42501）
+- `docs/tech-spec.md` 新增 3.8 节：政策说明、影响范围、最小权限口径
+
+### 说明
+- 现有表和现有功能**不受影响**（官方明确：现有授权保留，无需任何操作即可继续运行）
+
+---
+
 ## [2026-08-21] — Supabase 保活机制升级
 
 ### 修复
