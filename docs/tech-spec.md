@@ -266,3 +266,4 @@ const { data, error } = await supabase
 | 2 | 加固 | 新增幂等授权迁移（含"新增表模板"注释），可在 SQL Editor 执行一次使授权显式化 | database/migration-v6-data-api-grants.sql |
 | 3 | 文档 | CLAUDE.md 新增第 8 条硬性约定：**新表迁移必须带 GRANT**；结构树补 v5/v6 迁移 | CLAUDE.md |
 | 4 | 文档 | 技术规范新增 3.8 节：政策说明、影响范围、最小权限口径 | docs/tech-spec.md |
+| 5 | 安全 | **核实 Supabase Auth 配置：`disable_signup=true`（自助注册已关闭）**，实测随机账号注册被拒（`signup_disabled`）。核实借用 GitHub Actions 通道完成（本机网络不通 `*.supabase.co`），临时 Secret 与一次性工作流已全部移除 | dev-logs/2026-09-24.md |
