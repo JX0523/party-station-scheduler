@@ -1,0 +1,20 @@
+=== 1. 关闭前：auth 设置 ===
+{"disable_signup":true,"mailer_autoconfirm":false,"external_email_enabled":null}
+
+=== 2. 执行：关闭自助注册 (disable_signup=true) ===
+404 page not found
+
+HTTP:404
+
+=== 3. 关闭后：auth 设置复查 ===
+{"disable_signup":true,"mailer_autoconfirm":false,"external_email_enabled":null}
+
+=== 4. 实测：尝试注册随机账号（期望被拒绝）===
+{"code":422,"error_code":"signup_disabled","msg":"Signups not allowed for this instance"}
+
+RESULT: 注册已被阻止 ✅
+
+=== 5. 用户总数（应保持不变）===
+{"count":3}
+
+DONE
