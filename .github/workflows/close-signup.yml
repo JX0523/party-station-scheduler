@@ -1,0 +1,79 @@
+# 一次性任务：关闭 Supabase 自助注册并验证（2026-09-24）
+# 背景：登录页注册入口已在代码层隐藏，但 Supabase 后台 "Allow new users" 仍开启。
+#       本工作流借 GitHub Actions 服务器网络调用 Supabase Auth 管理接口关闭它，
+#       并把结果写回仓库 signup-report.txt（便于无登录核验）。用完即删。
+# 触发：本文件变更时自动运行一次；也可 Actions → Run workflow
+name: Close Supabase Signup (one-shot)
+on:
+  push:
+    paths:
+      - '.github/workflows/close-signup.yml'
+  workflow_dispatch:
+jobs:
+  close-signup:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Disable signup + verify (writes signup-report.txt)
+        env:
+          SUPA_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPA_SERVICE: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          set -uo pipefail
+          URL="${SUPA_URL%/}"
+          {
+            echo "=== 1. 关闭前：auth 设置 ==="
+            curl -s -H "apikey: ${SUPA_SERVICE}" -H "Authorization: Bearer ${SUPA_SERVICE}" \
+              "${URL}/auth/v1/settings" | jq -c '{disable_signup, mailer_autoconfirm, external_email_enabled}'
+
+            echo ""
+            echo "=== 2. 执行：关闭自助注册 (disable_signup=true) ==="
+            curl -s -w "\nHTTP:%{http_code}\n" -X PUT \
+              -H "apikey: ${SUPA_SERVICE}" -H "Authorization: Bearer ${SUPA_SERVICE}" \
+              -H "Content-Type: application/json" \
+              -d '{"disable_signup":true}' \
+              "${URL}/auth/v1/admin/settings" | tail -c 500
+
+            echo ""
+            echo "=== 3. 关闭后：auth 设置复查 ==="
+            curl -s -H "apikey: ${SUPA_SERVICE}" -H "Authorization: Bearer ${SUPA_SERVICE}" \
+              "${URL}/auth/v1/settings" | jq -c '{disable_signup, mailer_autoconfirm, external_email_enabled}'
+
+            echo ""
+            echo "=== 4. 实测：尝试注册随机账号（期望被拒绝）==="
+            RAND="signupcheck$(date +%s)$RANDOM"
+            RESP=$(curl -s -X POST \
+              -H "apikey: ${SUPA_SERVICE}" -H "Authorization: Bearer ${SUPA_SERVICE}" \
+              -H "Content-Type: application/json" \
+              -d "{\"email\":\"${RAND}@outlook.com\",\"password\":\"TempPass_2026!xyz\"}" \
+              "${URL}/auth/v1/signup")
+            echo "$RESP" | head -c 500
+            echo ""
+            if echo "$RESP" | grep -qi "signup_disabled\|Signups not allowed\|not allowed"; then
+              echo "RESULT: 注册已被阻止 ✅"
+            else
+              echo "RESULT: 注册仍可用 ⚠️ —— 清理测试账号"
+              NEWID=$(echo "$RESP" | jq -r '.id // empty' 2>/dev/null)
+              if [ -n "$NEWID" ]; then
+                curl -s -X DELETE -H "apikey: ${SUPA_SERVICE}" -H "Authorization: Bearer ${SUPA_SERVICE}" \
+                  "${URL}/auth/v1/admin/users/${NEWID}" > /dev/null && echo "已删除测试账号 ${NEWID}"
+              fi
+            fi
+
+            echo ""
+            echo "=== 5. 用户总数（应保持不变）==="
+            curl -s -H "apikey: ${SUPA_SERVICE}" -H "Authorization: Bearer ${SUPA_SERVICE}" \
+              "${URL}/auth/v1/admin/users?per_page=50" | jq -c '{count: (.users|length)}'
+            echo ""
+            echo "DONE"
+          } 2>&1 | tee signup-report.txt
+      - name: Commit report back
+        if: always()
+        run: |
+          git config user.name 'close-signup-bot'
+          git config user.email 'close-signup-bot@users.noreply.github.com'
+          git add signup-report.txt
+          git commit -m "report: close signup result" || echo "nothing to commit"
+          git push origin master || echo "PUSH_BACK_FAILED"
