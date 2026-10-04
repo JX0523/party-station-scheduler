@@ -74,9 +74,25 @@ Get-ChildItem test-*.mjs | ForEach-Object { node $_ }   # PowerShell
 
 ---
 
-## 4. 数据备份与恢复（强烈建议每学期做 1~2 次）
+## 4. 数据备份与恢复
 
-### 4.1 备份（导出 JSON）
+### 4.0 ⭐ 自动备份（已配置好，你什么都不用做）
+
+| 项目 | 说明 |
+|------|------|
+| 备份到哪 | 私有仓库 **github.com/JX0523/party-station-backups**（仅你本人可见，已验证 private ✅） |
+| 多久一次 | **每周日**北京时间约 11:30 自动执行（Actions 里也能随时手动触发） |
+| 备份内容 | 成员 / 课表 / 排班 / 学期配置 / 时段配置 / 放假配置 / 统计表（JSON）+ manifest（含行数） |
+| 保留策略 | 永久保留，每周一个文件夹 `backups/年-月-日/` |
+| 依赖你的电脑吗 | ❌ **不依赖** —— 由 GitHub 云端执行，旧电脑丢了也照常备份 |
+| 首次验证 | 已实测成功：2026-10-04 首份备份（18 成员 / 36 课表 / 47 排班 / 13 天放假配置）✅ |
+
+> ⚠️ 该仓库含成员姓名、电话等个人信息，**必须保持 Private**，不要改成公开。
+> 💡 每周的备份提交会让仓库保持活跃，不会被 GitHub 判定为闲置而停用定时任务。
+
+**恢复方式**：从该仓库下载某个日期的文件夹 → 用主仓库的 `tools/restore-data.mjs` 恢复（见 4.2）。
+
+### 4.1 手动备份（可选，平时用不到，因为已有 4.0 自动备份）
 ```powershell
 $env:SUPABASE_URL="https://mkbcbfzfrdrqywzjbrbu.supabase.co"
 $env:SUPABASE_SERVICE_KEY="<Supabase → Project Settings → API → secret key>"
@@ -84,7 +100,7 @@ node tools/backup-data.mjs D:\我的私有备份
 ```
 输出：`members / course_schedules / assignments / semester_config / slot_config / day_config / duty_stats` 的 JSON + `manifest.json`。
 
-> ⚠️ 备份含成员姓名、电话等个人信息：**只能放在私有位置**（私有网盘 / 私有仓库 / 移动硬盘），
+> ⚠️ 手动备份同样含个人信息：**只能放在私有位置**（私有网盘 / 私有仓库 / 移动硬盘），
 > **绝对不要提交到公开的 GitHub 仓库**。
 
 ### 4.2 恢复（灾难时）
@@ -145,7 +161,7 @@ node tools/backup-data.mjs D:\我的私有备份
 □ 记得 GitHub / Supabase / Netlify 三个账号的邮箱与密码（或能通过邮箱找回）
 □ 知道两个网站地址，新电脑浏览器能登录系统
 □ 需要改代码的：装好 Git + Node，克隆仓库，重建 frontend/.env
-□ 做过至少一次数据备份，并确认备份文件已放在【私有位置】
+□ 数据备份无需操心：已配置每周自动备份到私有仓库 party-station-backups（见 4.0）
 □ 旧电脑丢弃前：确认没有重要文件只留在这台机器上（按第 1 节表格逐项核对）
 □ 旧电脑清除敏感信息：删除 frontend/.env、node_modules、以及含个人信息的备份文件
 ```

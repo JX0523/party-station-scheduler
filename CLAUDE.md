@@ -158,6 +158,8 @@
      唯一需在本地重建的是 `frontend/.env`（被 gitignore，值从 Supabase → Project Settings → API 取）
    - 工具：`tools/backup-data.mjs`（导出全部业务表 JSON）、`tools/restore-data.mjs`（带 --confirm 才写入）、
      `tools/system-audit.mjs`（体检+模拟）
+   - **自动备份已上线**：私有仓库 `JX0523/party-station-backups` 每周日自动导出全部业务表（`backup.mjs` +
+     `.github/workflows/backup.yml`，密钥存于该私有仓库 Secrets），无需人工操作；恢复用 `tools/restore-data.mjs`
    - **备份含个人信息，禁止提交到公开仓库**；管理员手册见 `docs/migration-and-recovery.md`
    - 新电脑验证基线：克隆后 `node test-*.mjs` 应 311 项全过；`npm ci` + `npm run build` 应成功
 

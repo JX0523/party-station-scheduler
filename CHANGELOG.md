@@ -7,6 +7,23 @@
 
 ---
 
+## [2026-09-24] — 每周全自动备份上线（无需人工操作）
+
+### 新增
+- 创建**私有备份仓库** `JX0523/party-station-backups`（private 已验证）：
+  每周日 UTC 03:30（北京时间 11:30）自动导出全部业务表为 JSON 并提交，永久保留分日期文件夹
+- 备份内容：members / course_schedules / assignments / semester_config / slot_config / day_config / duty_stats + manifest（含行数）
+- 密钥（SUPABASE_URL / SUPABASE_SERVICE_KEY）存放于**该私有仓库**的 Secrets，不进入公开仓库
+
+### 验证
+- 已手动触发首份备份并核验：18 成员 / 36 课表 / 47 排班 / 13 天放假配置，与系统实际数据一致 ✅
+- 备份工作流每周提交可保持仓库活跃，不会被 GitHub 停用定时任务
+
+### 文档
+- `docs/migration-and-recovery.md` 新增 4.0 节「自动备份」；检查清单同步更新
+
+---
+
 ## [2026-09-24] — 换电脑/灾备保障：迁移手册 + 备份恢复工具
 
 ### 新增
