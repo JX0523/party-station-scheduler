@@ -81,6 +81,7 @@ GitHub Actions 部署时通过仓库 Secrets 注入：`VITE_SUPABASE_URL`、`VIT
 | [docs/design-guide.md](docs/design-guide.md) | UI 设计规范 |
 | [docs/execution-plan.md](docs/execution-plan.md) | 分阶段执行计划 |
 | [docs/git-workflow.md](docs/git-workflow.md) | git 提交与 CI/CD 部署流程 |
+| [docs/migration-and-recovery.md](docs/migration-and-recovery.md) | **换电脑/灾备**：资产清单、新电脑上手、备份恢复、应急处理 |
 | [使用手册.md](使用手册.md) | 面向使用者的操作手册 |
 | [排班操作速查指南.md](排班操作速查指南.md) | 每周 5 分钟速查 |
 | [CHANGELOG.md](CHANGELOG.md) | 版本发布记录 |

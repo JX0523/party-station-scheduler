@@ -17,6 +17,7 @@
 | 设计规范 | [docs/design-guide.md](docs/design-guide.md) | UI设计风格、配色、组件规范 |
 | 执行计划 | [docs/execution-plan.md](docs/execution-plan.md) | 分阶段实施步骤与里程碑 |
 | Git/部署流程 | [docs/git-workflow.md](docs/git-workflow.md) | git 约定、CI/CD、回滚、数据库迁移流程 |
+| **迁移与灾备** | [docs/migration-and-recovery.md](docs/migration-and-recovery.md) | **换电脑/数据恢复**：资产清单、新机上手、备份恢复、应急清单 |
 
 ## 开发日志
 
@@ -152,6 +153,13 @@
   - **「第1周周一」自动推算**（`inferSemesterStart`，依据 current_week + 今天），无需管理员输入；
     推算不准时可在面板手动修正（localStorage 键 `dsh_semester_start_override`）；放假配置本身在云端
    - 「清理放假日的排班」只允许 `week_number >= current_week`（历史/已值完的周绝不改动）
+12. **换电脑 / 灾备（2026-09-24 新增）**：
+   - 资产位置：**数据在 Supabase 云端、代码+文档在 GitHub、部署在 Netlify/Pages**，均与个人电脑无关；
+     唯一需在本地重建的是 `frontend/.env`（被 gitignore，值从 Supabase → Project Settings → API 取）
+   - 工具：`tools/backup-data.mjs`（导出全部业务表 JSON）、`tools/restore-data.mjs`（带 --confirm 才写入）、
+     `tools/system-audit.mjs`（体检+模拟）
+   - **备份含个人信息，禁止提交到公开仓库**；管理员手册见 `docs/migration-and-recovery.md`
+   - 新电脑验证基线：克隆后 `node test-*.mjs` 应 311 项全过；`npm ci` + `npm run build` 应成功
 
 ## 快速命令
 
