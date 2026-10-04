@@ -172,7 +172,9 @@ export function runSchedulingAlgorithm({
   }
 
   let roleLabel
-  if (needZhuXi) {
+  if (totalMembers === 0) {
+    roleLabel = '无可用成员'
+  } else if (needZhuXi) {
     roleLabel = '全部角色'
   } else if (buYuanTotal >= 5 && buZhangTotal > 0) {
     roleLabel = `部员主力+部长≤${buZhangQuota}人`

@@ -21,7 +21,13 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-        run: node tools/system-audit.mjs audit-report.md
+        run: |
+          if [ -z "${SUPABASE_SERVICE_KEY:-}" ]; then
+            echo "::warning::未配置 SUPABASE_SERVICE_KEY，跳过审计（临时添加该 Secret 后再运行即可）"
+            echo "# 系统审计跳过：未配置 SUPABASE_SERVICE_KEY" > audit-report.md
+            exit 0
+          fi
+          node tools/system-audit.mjs audit-report.md
       - name: Show report in job summary
         if: always()
         run: cat audit-report.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true

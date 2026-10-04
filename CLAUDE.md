@@ -139,7 +139,10 @@
 9. **环境变量**：`VITE_SUPABASE_URL`、`VITE_SUPABASE_ANON_KEY` 必填；
    `VITE_ALLOW_REGISTRATION=true` 才显示登录页注册入口（默认关闭）；
    `VITE_BASE` 用于 GitHub Pages 子路径部署。CI secrets 与 `frontend/.env` 保持一致。
-10. **测试全部通过**：`Get-ChildItem test-*.mjs | ForEach-Object { node $_ }`（282项，8个套件）。
+10. **测试全部通过**：`Get-ChildItem test-*.mjs | ForEach-Object { node $_ }`（311项，9个套件）。
+    **系统审计**：`tools/system-audit.mjs`（真实数据完整性 + 真实算法模拟，输出 Markdown 报告）；
+    在能访问 Supabase 的网络里执行：`SUPABASE_URL=... SUPABASE_SERVICE_KEY=... node tools/system-audit.mjs report.md`；
+    或临时给仓库加 `SUPABASE_SERVICE_KEY` Secret 后运行 Actions「System Audit」（无密钥会自动跳过）。
    新增行为必须补测试（参考 test-holiday-dates.mjs / test-fixed-behaviors.mjs 的风格）。
 11. **放假功能（2026-09-24 新增）**：
    - 数据仍存 `day_config`（`is_workday=false` 即放假），**无需新表**；所有电脑共享
