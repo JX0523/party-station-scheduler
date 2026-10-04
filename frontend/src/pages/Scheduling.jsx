@@ -242,6 +242,16 @@ export default function Scheduling() {
     <div className="page-container">
       {toast && <div className={`toast toast-${toast.type}`}>{toast.msg}</div>}
 
+      {/* 新功能提示：放假设置 */}
+      <div style={{
+        fontSize: 13, color: '#7a4b1a', background: '#FFF3E0', border: '1px solid #FFCC80',
+        borderRadius: 8, padding: '8px 14px', marginBottom: 14, lineHeight: 1.7
+      }}>
+        🎉 <strong>新功能：放假设置</strong> — 可以去
+        <a href="/" style={{ color: '#C41E3A', fontWeight: 600, margin: '0 4px' }}>首页「放假设置」</a>
+        直接选日期放假（支持连放多天），放假当天系统不再排班；设置完回到本页点「重新生成排班」即可生效。
+      </div>
+
       <div className="page-header">
         <h2 className="page-title">排班管理</h2>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>

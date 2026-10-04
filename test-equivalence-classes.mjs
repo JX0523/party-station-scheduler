@@ -254,12 +254,22 @@ test('7天全工作日 -> workdays=[1-7]', () => {
   eq(wds, [1, 2, 3, 4, 5, 6, 7])
 })
 
-// EC-2.5: 全false -> fallback到默认
-console.log('  EC-2.5: 全false -> fallback')
-test('全false fallback到周一至周五', () => {
+// EC-2.5: 全false（整周放假）-> 不回退，该周不排班（2026-09-24 语义修正）
+console.log('  EC-2.5: 全false（整周放假）-> 不排班')
+test('全false -> workdays=[]（整周放假，不回退默认）', () => {
   const dc = {}
   for (let d = 1; d <= 7; d++) dc[d] = false
   const wds = extractWorkdays({ ...baseParams, dayConfig: dc })
+  eq(wds, [])
+})
+test('全false 时该周生成 0 条排班', () => {
+  const dc = {}
+  for (let d = 1; d <= 7; d++) dc[d] = false
+  const result = runSchedulingAlgorithm({ ...baseParams, dayConfig: dc })
+  eq(result.assignments.length, 0)
+})
+test('空对象 {} 视同无配置 -> 回退周一至周五', () => {
+  const wds = extractWorkdays({ ...baseParams, dayConfig: {} })
   eq(wds, [1, 2, 3, 4, 5])
 })
 

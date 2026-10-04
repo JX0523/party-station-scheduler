@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
 import { runSchedulingAlgorithm, resolveScheduleKey } from '../lib/scheduling-algorithm.js'
 import DaySelector from '../components/DaySelector.jsx'
+import HolidayPanel from '../components/HolidayPanel.jsx'
 
 const ALL_DAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
 const ALL_DAYS_SHORT = ['一', '二', '三', '四', '五', '六', '日']
@@ -23,6 +24,10 @@ export default function Dashboard() {
   const [addMode, setAddMode] = useState(null)
   const [dayConfig, setDayConfig] = useState(null)
   const generatingRef = useRef(false)  // 防止并发生成导致重复排班
+  const [dayConfigVersion, setDayConfigVersion] = useState(0) // 放假设置变更后强制 DaySelector 重新加载
+  const [showFeatureNotice, setShowFeatureNotice] = useState(
+    () => localStorage.getItem('dsh_notice_holiday_v1') !== 'hidden'
+  )
 
   useEffect(() => { loadAll() }, [])
 
@@ -265,6 +270,14 @@ export default function Dashboard() {
     loadPastWeeks()
   }
 
+  // 放假设置变更后：重新加载本周工作日配置，并让 DaySelector 重新挂载显示最新状态
+  async function reloadDayConfig() {
+    const cw2 = config?.current_week || 1
+    const { data: dayRows } = await supabase.from('day_config').select('*').eq('week_number', cw2)
+    setDayConfig(buildDayConfigMap(dayRows))
+    setDayConfigVersion(v => v + 1)
+  }
+
   async function loadCurrentWeek() {
     const cw = config?.current_week || 1
     const { data: curr } = await supabase.from('assignments')
@@ -325,6 +338,31 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* ===== 新功能提示（可关闭） ===== */}
+      {showFeatureNotice && (
+        <div style={{
+          display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 16,
+          background: 'linear-gradient(90deg,#FFF3E0,#FFEBEE)', border: '1px solid #FFCC80',
+          borderRadius: 10, padding: '12px 16px'
+        }}>
+          <span style={{ fontSize: 22, lineHeight: 1 }}>🎉</span>
+          <div style={{ flex: 1, fontSize: 13, color: '#7a4b1a', lineHeight: 1.7 }}>
+            <strong style={{ fontSize: 14 }}>新功能上线：放假设置</strong>
+            <span className="badge badge-red" style={{ marginLeft: 8, fontSize: 11 }}>NEW</span>
+            <div style={{ marginTop: 2 }}>
+              现在可以<strong>直接选择日期放假</strong>（支持连续多天，例如连放 13 天）——
+              放假当天系统<strong>不再自动排班</strong>。在下方「🎉 放假设置」里选好日期即可，
+              已有的排班可在那里一键清理，或到「排班管理」重新生成。
+            </div>
+          </div>
+          <button
+            className="btn btn-small btn-secondary"
+            onClick={() => { localStorage.setItem('dsh_notice_holiday_v1', 'hidden'); setShowFeatureNotice(false) }}
+            title="知道了，不再提示"
+          >知道了 ✕</button>
+        </div>
+      )}
+
       {/* 信息卡片 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, marginBottom: 20 }}>
         <div className="card" style={{ textAlign: 'center' }}>
@@ -364,9 +402,12 @@ export default function Dashboard() {
         <button className="btn btn-secondary" onClick={() => navigate('/stats')}>📊 统计导出</button>
       </div>
 
+      {/* ===== 放假设置（新功能） ===== */}
+      <HolidayPanel config={config} onChanged={reloadDayConfig} />
+
       {/* ===== 工作日配置 ===== */}
       <div style={{ marginBottom: 12 }}>
-        <DaySelector weekNumber={cw} locked={false} onChange={setDayConfig} />
+        <DaySelector key={dayConfigVersion} weekNumber={cw} locked={false} onChange={setDayConfig} />
       </div>
 
       {/* ===== 本周值班表（大，可操作） ===== */}

@@ -81,8 +81,11 @@ export function runSchedulingAlgorithm({
       }
     }
   }
-  if (workdays.length === 0) {
-    // 默认周一至周五
+  // 2026-09-24 修复：只有「完全没有工作日配置」时才回退默认周一~周五。
+  // 若管理员显式把某周所有天都设为放假（例如连放多天假），workdays 为空 = 该周不排班，
+  // 不能回退成周一~周五，否则「放假」设置会被无声忽略。
+  const hasExplicitDayConfig = dayConfig && Object.keys(dayConfig).length > 0
+  if (!hasExplicitDayConfig) {
     workdays.push(1, 2, 3, 4, 5)
   }
   const dayKeyMap = {} // dayNum → 'mon'/'tue'/...（调休日用被补天的 key）

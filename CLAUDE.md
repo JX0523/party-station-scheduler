@@ -139,8 +139,15 @@
 9. **环境变量**：`VITE_SUPABASE_URL`、`VITE_SUPABASE_ANON_KEY` 必填；
    `VITE_ALLOW_REGISTRATION=true` 才显示登录页注册入口（默认关闭）；
    `VITE_BASE` 用于 GitHub Pages 子路径部署。CI secrets 与 `frontend/.env` 保持一致。
-10. **测试全部通过**：`Get-ChildItem test-*.mjs | ForEach-Object { node $_ }`（254项，7个套件）。
-   新增行为必须补测试（参考 test-fixed-behaviors.mjs 的风格）。
+10. **测试全部通过**：`Get-ChildItem test-*.mjs | ForEach-Object { node $_ }`（282项，8个套件）。
+   新增行为必须补测试（参考 test-holiday-dates.mjs / test-fixed-behaviors.mjs 的风格）。
+11. **放假功能（2026-09-24 新增）**：
+   - 数据仍存 `day_config`（`is_workday=false` 即放假），**无需新表**；所有电脑共享
+   - **语义（重要）**：显式配置了工作日列表就以其为准——整周全放假 = `workdays=[]` = 该周不排班；
+     只有「完全没有 dayConfig」时才回退默认周一~周五。修改算法时不要恢复旧的空数组回退逻辑
+   - 日期→(周次,星期) 换算在 `frontend/src/lib/holiday-dates.js`（纯函数，已单测）；
+     「第1周周一」存在浏览器 localStorage（仅用于换算），真正的放假配置在云端
+   - 「清理放假日的排班」只允许 `week_number >= current_week`（历史/已值完的周绝不改动）
 
 ## 快速命令
 

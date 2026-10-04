@@ -203,6 +203,20 @@ CREATE TABLE day_config (
 - `try/finally` 确保异常时锁也释放
 - 已移除 `<StrictMode>`（开发模式双重挂载会触发并发生成）
 
+### 4.4 放假设置（2026-09-24 新增）
+
+- **入口**：首页「🎉 放假设置」面板（`frontend/src/components/HolidayPanel.jsx`）+ 顶部新功能横幅
+- **数据**：复用 `day_config` 表（`is_workday=false` 表示放假），**不新增表/字段**；云端共享
+- **日期换算**：`frontend/src/lib/holiday-dates.js`（纯函数，26 项单测）
+  - `dateToWeekDay(date, semesterStart)` → `{week, day}`；`expandDateRange(start, end, semesterStart, totalWeeks)`
+  - 「第1周周一」仅本地 localStorage 记忆（`dsh_semester_start_date`），用于把日期映射成周次与星期
+- **排班行为**：算法按 `day_config` 解析工作日列表（`meta.workdays`）
+  - 显式配置 → 以配置为准；**整周全放假 = `workdays=[]` = 该周 0 条排班**（2026-09-24 修复，此前会回退默认周一~周五）
+  - 未配置任何工作日记录（`dayConfig` 为空/null）→ 回退默认周一~周五
+- **已有排班的处理**：设置放假不会自动删除已有排班
+  - 方式一：到「排班管理」对相关周重新生成
+  - 方式二：面板内「清理放假日的排班」（仅 `week_number >= current_week`，历史周不动，需确认）
+
 ## 5. API 调用方式
 
 不写后端代码，前端直接通过 Supabase JS Client 调用数据库：
@@ -257,6 +271,16 @@ const { data, error } = await supabase
 | 8 | 加固 | 成员Excel导入：角色校验、错误提示、跳过行统计 | Members.jsx |
 | 9 | 安全 | 登录页默认关闭公开注册（VITE_ALLOW_REGISTRATION 控制） | Login.jsx / .env.example |
 | 10 | 测试 | 新增 test-fixed-behaviors.mjs（11项回归）；更新受影响的旧测试 | test-fixed-behaviors.mjs / 各 test-*.mjs |
+
+### 2026-09-24（追加）— 放假功能 + 整周放假不排班修复（详见 dev-logs/2026-09-24.md 追加2）
+
+| # | 类型 | 改动 | 涉及文件 |
+|---|------|------|---------|
+| 1 | 修复 | **整周放假仍排班**：显式全放假时算法回退默认周一~周五；改为仅「无任何工作日配置」才回退，显式全放假=该周不排班 | scheduling-algorithm.js / test-equivalence-classes.mjs |
+| 2 | 功能 | **放假设置面板**：按日期区间批量放假（支持连放多天）、已放假列表与按周取消、清理放假日排班（仅未锁定周） | components/HolidayPanel.jsx |
+| 3 | 功能 | 日期→(周次,星期) 换算纯函数库（含边界与非法输入处理） | lib/holiday-dates.js |
+| 4 | 功能 | 首页新功能提示横幅（可关闭）+ 排班管理页新功能提示 | Dashboard.jsx / Scheduling.jsx |
+| 5 | 测试 | 新增 test-holiday-dates.mjs（26 项）；等价类 EC-2.5 更新（+3 项）；全量 282/282 | test-holiday-dates.mjs / test-equivalence-classes.mjs |
 
 ### 2026-09-24 — Supabase Data API 授权政策应对（详见 dev-logs/2026-09-24.md）
 
