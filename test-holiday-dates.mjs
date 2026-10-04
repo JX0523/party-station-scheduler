@@ -4,7 +4,8 @@
  */
 import {
   parseYMD, toUTC, isMonday, utcWeekday, dateToWeekDay,
-  formatMD, weekdayCN, expandDateRange, toWeekDaySet, groupHolidayRows
+  formatMD, weekdayCN, expandDateRange, toWeekDaySet, groupHolidayRows,
+  addDays, inferSemesterStart, describeWeeks, todayYMD
 } from './frontend/src/lib/holiday-dates.js'
 import { runSchedulingAlgorithm } from './frontend/src/lib/scheduling-algorithm.js'
 
@@ -112,6 +113,44 @@ test('groupHolidayRows 归组并算出日期标签', () => {
   eq(g[0].week, 5)
   eq(g[0].days.map(d => d.day), [4, 5])
   eq(g[0].days[0].dateLabel, '10月1日')
+})
+
+console.log('\n📋 6.5 自动推算第1周周一（无需用户输入）')
+test('当前第2周 + 今天周四(2026-09-24) → 第1周周一 = 2026-09-14', () => {
+  eq(inferSemesterStart(2, '2026-09-24'), '2026-09-14')
+})
+test('当前第1周 + 今天周一 → 第1周周一 = 今天', () => {
+  eq(inferSemesterStart(1, '2026-08-31'), '2026-08-31')
+})
+test('当前第1周 + 今天周日 → 第1周周一 = 6天前', () => {
+  eq(inferSemesterStart(1, '2026-09-06'), '2026-08-31')
+})
+test('当前第5周 + 今天周一 → 往前推4周', () => {
+  eq(inferSemesterStart(5, '2026-09-28'), '2026-08-31')
+})
+test('推算结果始终是周一', () => {
+  for (const [w, d] of [[1, '2026-09-24'], [3, '2026-09-24'], [10, '2026-10-01'], [18, '2027-01-01']]) {
+    ok(isMonday(inferSemesterStart(w, d)), w + '/' + d + ' 应是周一')
+  }
+})
+test('推算结果可与日期换算闭环（今天的周次 = currentWeek）', () => {
+  const start = inferSemesterStart(4, '2026-09-24')
+  eq(dateToWeekDay('2026-09-24', start), { week: 4, day: 4 })
+})
+test('非法 currentWeek 返回 null', () => {
+  eq(inferSemesterStart(0, '2026-09-24'), null)
+  eq(inferSemesterStart('x', '2026-09-24'), null)
+  eq(inferSemesterStart(2, 'bad-date'), null)
+})
+test('addDays 跨月/跨年', () => {
+  eq(addDays('2026-09-30', 1), '2026-10-01')
+  eq(addDays('2026-12-31', 1), '2027-01-01')
+  eq(addDays('2027-01-01', -1), '2026-12-31')
+})
+test('describeWeeks 输出第1周与当前周范围', () => {
+  const d = describeWeeks('2026-09-14', 2)
+  eq(d.week1, { from: '2026-09-14', to: '2026-09-20' })
+  eq(d.current, { from: '2026-09-21', to: '2026-09-27' })
 })
 
 console.log('\n📋 7. 排班算法联动（整周放假不排班）')

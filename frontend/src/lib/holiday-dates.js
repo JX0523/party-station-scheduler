@@ -48,6 +48,55 @@ export function utcWeekday(str) {
 
 const DAY_MS = 86400000
 
+/** Date → 'YYYY-MM-DD'（UTC 口径） */
+export function toYMD(date) {
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`
+}
+
+/** 今天（本地日期，取年月日后转 UTC 口径字符串） */
+export function todayYMD(now = new Date()) {
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+}
+
+/** 日期加减天数 */
+export function addDays(dateStr, n) {
+  const t = toUTC(dateStr)
+  if (t === null) return null
+  return toYMD(new Date(t + n * DAY_MS))
+}
+
+/**
+ * 自动推算「第1周周一」——依据系统设定：current_week 就是包含"今天"的那一周。
+ * 无需管理员手工填写；若推算不准（例如当前周没及时更新），可在界面上手动修正。
+ *
+ * @param {number} currentWeek 学期配置里的当前周（1..total）
+ * @param {string} [today] 'YYYY-MM-DD'，默认今天
+ * @returns {string|null} 第1周周一的日期
+ */
+export function inferSemesterStart(currentWeek, today = todayYMD()) {
+  const w = Number(currentWeek)
+  if (!Number.isFinite(w) || w < 1) return null
+  const day = utcWeekday(today)
+  if (day === null) return null
+  // 本周周一
+  const thisMonday = addDays(today, -(day - 1))
+  if (thisMonday === null) return null
+  // 往前推 (w-1) 周
+  return addDays(thisMonday, -7 * (w - 1))
+}
+
+/**
+ * 推算结果的展示信息（第1周周一 ~ 该周周日 / 本周范围）
+ */
+export function describeWeeks(semesterStart, currentWeek) {
+  if (!semesterStart) return null
+  const start = semesterStart
+  const startSun = addDays(start, 6)
+  const curMon = addDays(start, 7 * (currentWeek - 1))
+  const curSun = addDays(curMon, 6)
+  return { week1: { from: start, to: startSun }, current: { from: curMon, to: curSun } }
+}
+
 /**
  * 日期 → { week, day }
  * @param {string} dateStr 目标日期 'YYYY-MM-DD'

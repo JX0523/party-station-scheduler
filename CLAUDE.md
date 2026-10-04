@@ -146,7 +146,8 @@
    - **语义（重要）**：显式配置了工作日列表就以其为准——整周全放假 = `workdays=[]` = 该周不排班；
      只有「完全没有 dayConfig」时才回退默认周一~周五。修改算法时不要恢复旧的空数组回退逻辑
    - 日期→(周次,星期) 换算在 `frontend/src/lib/holiday-dates.js`（纯函数，已单测）；
-     「第1周周一」存在浏览器 localStorage（仅用于换算），真正的放假配置在云端
+  - **「第1周周一」自动推算**（`inferSemesterStart`，依据 current_week + 今天），无需管理员输入；
+    推算不准时可在面板手动修正（localStorage 键 `dsh_semester_start_override`）；放假配置本身在云端
    - 「清理放假日的排班」只允许 `week_number >= current_week`（历史/已值完的周绝不改动）
 
 ## 快速命令

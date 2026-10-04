@@ -209,7 +209,10 @@ CREATE TABLE day_config (
 - **数据**：复用 `day_config` 表（`is_workday=false` 表示放假），**不新增表/字段**；云端共享
 - **日期换算**：`frontend/src/lib/holiday-dates.js`（纯函数，26 项单测）
   - `dateToWeekDay(date, semesterStart)` → `{week, day}`；`expandDateRange(start, end, semesterStart, totalWeeks)`
-  - 「第1周周一」仅本地 localStorage 记忆（`dsh_semester_start_date`），用于把日期映射成周次与星期
+  - **「第1周周一」自动推算**：`inferSemesterStart(currentWeek, today)` —— 依据「current_week 就是包含今天的那一周」
+    倒推本周周一再前推 (current_week-1) 周，管理员无需手工填写；
+    若推算不准（如当前周未及时更新），可在面板「推算不准？修正」里手动指定（仅本机 localStorage 记忆，键 `dsh_semester_start_override`）
+  - 面板顶部蓝色提示条展示推算结果（第1周周一日期 + 本周日期范围）供核对
 - **排班行为**：算法按 `day_config` 解析工作日列表（`meta.workdays`）
   - 显式配置 → 以配置为准；**整周全放假 = `workdays=[]` = 该周 0 条排班**（2026-09-24 修复，此前会回退默认周一~周五）
   - 未配置任何工作日记录（`dayConfig` 为空/null）→ 回退默认周一~周五

@@ -7,16 +7,18 @@
  *  - 展示已设置的放假日，可按周取消
  *  - 可选：清除这些日期上已生成的排班（仅未锁定周，需确认）
  *
- * 说明：日期→周次换算需要「第1周周一」的日期，保存在本机浏览器（localStorage）；
- *      真正的放假配置存在数据库 day_config，所有电脑共享。
+ * 周次换算：**自动推算「第1周周一」**（依据 当前第几周 + 今天日期），管理员无需手工填写；
+ *          推算不准时可在面板里手动修正（仅本机记忆）。
+ *          真正的放假配置存在数据库 day_config，所有电脑共享。
  */
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase.js'
 import {
-  isMonday, expandDateRange, toWeekDaySet, groupHolidayRows, weekdayCN
+  isMonday, expandDateRange, toWeekDaySet, groupHolidayRows, weekdayCN,
+  inferSemesterStart, describeWeeks, formatMD
 } from '../lib/holiday-dates.js'
 
-const LS_KEY = 'dsh_semester_start_date'
+const LS_OVERRIDE = 'dsh_semester_start_override' // 仅当自动推算不准时使用
 
 function todayStr() {
   const d = new Date()
@@ -24,23 +26,28 @@ function todayStr() {
 }
 
 export default function HolidayPanel({ config, onChanged }) {
-  const [startDate, setStartDate] = useState(() => localStorage.getItem(LS_KEY) || '')
+  const [override, setOverride] = useState(() => localStorage.getItem(LS_OVERRIDE) || '')
+  const [showOverride, setShowOverride] = useState(false)
   const [from, setFrom] = useState(todayStr)
   const [to, setTo] = useState(todayStr)
   const [rows, setRows] = useState([])
   const [busy, setBusy] = useState(false)
-  const [msg, setMsg] = useState(null) // {type,text}
+  const [msg, setMsg] = useState(null)
   const [showHelp, setShowHelp] = useState(false)
 
   const totalWeeks = config?.total_weeks || 20
   const currentWeek = config?.current_week || 1
+
+  // 自动推算第1周周一（无需用户填写）；若有手动修正则优先
+  const autoStart = inferSemesterStart(currentWeek)
+  const startDate = override || autoStart || ''
+  const info = describeWeeks(startDate, currentWeek)
 
   async function loadRows() {
     const { data } = await supabase.from('day_config').select('*').order('week_number').order('day_of_week')
     setRows(data || [])
   }
 
-  // 首次加载：在回调里 setState（异步），避免 effect 内同步 setState
   useEffect(() => {
     let cancelled = false
     supabase.from('day_config').select('*').order('week_number').order('day_of_week')
@@ -48,21 +55,21 @@ export default function HolidayPanel({ config, onChanged }) {
     return () => { cancelled = true }
   }, [])
 
-  function saveStart(v) {
-    setStartDate(v)
-    if (v) localStorage.setItem(LS_KEY, v)
-    else localStorage.removeItem(LS_KEY)
+  function saveOverride(v) {
+    setOverride(v)
+    if (v) localStorage.setItem(LS_OVERRIDE, v)
+    else localStorage.removeItem(LS_OVERRIDE)
   }
 
-  function flash(type, text) { setMsg({ type, text }); setTimeout(() => setMsg(null), 6000) }
+  function flash(type, text) { setMsg({ type, text }); setTimeout(() => setMsg(null), 7000) }
 
   // 设为放假
   async function applyHoliday() {
-    if (!startDate) return flash('error', '请先填写「第1周周一」的日期（用于换算周次）')
-    if (!isMonday(startDate)) return flash('error', '「第1周周一」必须填周一那一天，请检查')
+    if (!startDate) return flash('error', '无法推算周次，请在下方「手动修正」里填写第1周周一')
+    if (override && !isMonday(override)) return flash('error', '手动指定的「第1周周一」必须是周一，请检查')
     const r = expandDateRange(from, to, startDate, totalWeeks)
     if (r.error) return flash('error', r.error)
-    if (r.days.length === 0) return flash('error', '所选区间没有落在学期周次内（请检查日期或总周数）')
+    if (r.days.length === 0) return flash('error', '所选区间没有落在学期周次内（请检查日期或「当前周」设置）')
 
     setBusy(true)
     try {
@@ -86,11 +93,10 @@ export default function HolidayPanel({ config, onChanged }) {
       if (onChanged) onChanged()
       const weeks = [...new Set(set.map(x => x.week))].join('、')
       const extra = r.outOfRange && r.outOfRange.length ? `（另有 ${r.outOfRange.length} 天超出学期周数，已忽略）` : ''
-      flash('success', `已设置放假 ${done} 天，涉及第 ${weeks} 周${extra}。请到「排班管理」重新生成相关周，或点下方按钮清理已有排班。`)
+      flash('success', `已设置放假 ${done} 天，涉及第 ${weeks} 周${extra}。请到「排班管理」重新生成相关周，或点「清理放假日的排班」。`)
     } finally { setBusy(false) }
   }
 
-  // 取消某一周的放假（删除 is_workday=false 的记录，恢复默认周一~周五）
   async function cancelWeek(week) {
     if (!confirm(`确定取消第 ${week} 周的放假设置吗？\n\n该周将恢复为默认工作日（周一~周五）。`)) return
     setBusy(true)
@@ -102,7 +108,6 @@ export default function HolidayPanel({ config, onChanged }) {
     } finally { setBusy(false) }
   }
 
-  // 清理放假日上已生成的排班（仅未锁定周）
   async function clearAssignments() {
     const holidays = rows.filter(x => x.is_workday === false && x.week_number >= currentWeek)
     if (holidays.length === 0) return flash('info', '没有可清理的排班（放假日期都属于已锁定的历史周）')
@@ -115,7 +120,7 @@ export default function HolidayPanel({ config, onChanged }) {
           .eq('week_number', h.week_number).eq('day_of_week', h.day_of_week)
         if (!error) removed++
       }
-      flash('success', `已清理 ${removed} 个放假时段上已有的排班。建议回到「排班管理」点一次重新生成，把有空缺的周补齐。`)
+      flash('success', `已清理 ${removed} 个放假时段上已有的排班。建议到「排班管理」点一次「重新生成」，把有空缺的周补齐。`)
     } finally { setBusy(false) }
   }
 
@@ -129,45 +134,49 @@ export default function HolidayPanel({ config, onChanged }) {
         <button className="btn btn-small btn-secondary" onClick={() => setShowHelp(!showHelp)}>{showHelp ? '收起说明' : '怎么用？'}</button>
       </div>
 
-      <p style={{ fontSize: 13, color: '#666', marginBottom: 12 }}>
-        选择日期即可放假，<strong>放假当天系统不会自动排班</strong>（支持连续多天，如连放 13 天假）。
-        设置后请到「排班管理」对相关周点一次「重新生成排班」。
+      <p style={{ fontSize: 13, color: '#666', marginBottom: 10 }}>
+        选好「开始 / 结束日期」点一下就行，<strong>放假当天系统不会自动排班</strong>（支持连续多天，如连放 13 天）。
+        设置后到「排班管理」重新生成相关周，或用下方按钮一键清理。
       </p>
 
-      {showHelp && (
-        <div style={{ background: '#FFF8F0', border: '1px dashed #E0C9A6', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 13, color: '#7a5c3a', lineHeight: 1.8 }}>
-          <div>① <strong>先填「第1周周一」</strong>：打开「学期设置」确认学期从哪一周开始，填那一周的周一日期（必须是周一）。<br/>
-            ② 选好<strong>开始/结束日期</strong> → 点「设为放假」。<br/>
-            ③ 假期结束后想恢复：在下方列表点「取消该周放假」，或把该天改回工作日。<br/>
-            ④ 已生成的排班不会自动消失：点「重新生成」或使用「清理放假日的排班」。</div>
-          <div style={{ marginTop: 6, color: '#999', fontSize: 12 }}>
-            「第1周周一」只保存在本机浏览器，用于日期换算；放假配置本身存在云端，所有电脑共享。
-          </div>
+      {/* 自动推算信息（无需用户填写） */}
+      {info && (
+        <div style={{ fontSize: 12.5, color: '#1565c0', background: '#E3F2FD', border: '1px solid #90CAF9',
+          borderRadius: 6, padding: '7px 12px', marginBottom: 10, lineHeight: 1.7 }}>
+          📅 系统已自动推算（按「当前第 {currentWeek} 周」）：第1周周一 = <strong>{formatMD(info.week1.from)}</strong>
+          （{formatMD(info.week1.from)} ~ {formatMD(info.week1.to)}）；
+          本周 = <strong>{formatMD(info.current.from)} ~ {formatMD(info.current.to)}</strong>
+          <button className="btn btn-small btn-secondary" style={{ marginLeft: 10, padding: '1px 8px', fontSize: 11 }}
+            onClick={() => setShowOverride(!showOverride)}>{showOverride ? '收起修正' : '推算不准？修正'}</button>
         </div>
       )}
 
-      {/* 输入区 */}
+      {showOverride && (
+        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: 10,
+          background: '#FFF8F0', border: '1px dashed #E0C9A6', borderRadius: 6, padding: '8px 12px' }}>
+          <div>
+            <label className="form-label" style={{ fontSize: 12 }}>手动指定第1周周一（必须是周一）</label>
+            <input type="date" className="form-input" style={{ width: 160 }} value={override}
+              onChange={e => saveOverride(e.target.value)} />
+          </div>
+          <button className="btn btn-small btn-secondary" onClick={() => { saveOverride(''); setShowOverride(false) }}>恢复自动推算</button>
+          {override && !isMonday(override) && <span style={{ fontSize: 12, color: '#c62828' }}>⚠️ 不是周一，请修正</span>}
+        </div>
+      )}
+
+      {/* 输入区（只选日期） */}
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 10 }}>
         <div>
-          <label className="form-label" style={{ fontSize: 12 }}>第1周周一（换算用）</label>
-          <input type="date" className="form-input" style={{ width: 160 }} value={startDate}
-            onChange={e => saveStart(e.target.value)} />
-        </div>
-        <div>
           <label className="form-label" style={{ fontSize: 12 }}>放假开始</label>
-          <input type="date" className="form-input" style={{ width: 160 }} value={from} onChange={e => setFrom(e.target.value)} />
+          <input type="date" className="form-input" style={{ width: 165 }} value={from} onChange={e => setFrom(e.target.value)} />
         </div>
         <div>
           <label className="form-label" style={{ fontSize: 12 }}>放假结束</label>
-          <input type="date" className="form-input" style={{ width: 160 }} value={to} onChange={e => setTo(e.target.value)} />
+          <input type="date" className="form-input" style={{ width: 165 }} value={to} onChange={e => setTo(e.target.value)} />
         </div>
         <button className="btn btn-primary" onClick={applyHoliday} disabled={busy}>{busy ? '处理中...' : '🌴 设为放假'}</button>
         <button className="btn btn-secondary" onClick={clearAssignments} disabled={busy || holidayCount === 0}>🧹 清理放假日的排班</button>
       </div>
-
-      {startDate && !isMonday(startDate) && (
-        <div style={{ fontSize: 13, color: '#c62828', marginBottom: 8 }}>⚠️ 填写的「第1周周一」不是周一，请修正（否则周次会算错）</div>
-      )}
 
       {msg && (
         <div style={{ fontSize: 13, marginBottom: 10, padding: '8px 12px', borderRadius: 6,
