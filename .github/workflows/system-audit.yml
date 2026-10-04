@@ -24,7 +24,7 @@ jobs:
         run: |
           if [ -z "${SUPABASE_SERVICE_KEY:-}" ]; then
             echo "::warning::未配置 SUPABASE_SERVICE_KEY，跳过审计（临时添加该 Secret 后再运行即可）"
-            echo "# 系统审计跳过：未配置 SUPABASE_SERVICE_KEY" > audit-report.md
+            echo "（本次跳过，不修改已有 audit-report.md）"
             exit 0
           fi
           node tools/system-audit.mjs audit-report.md
