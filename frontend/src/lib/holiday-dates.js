@@ -161,6 +161,30 @@ export function toWeekDaySet(days) {
 }
 
 /**
+ * 把「将设置的放假日」描述成一句话，便于用户在下笔前核对周次是否正确
+ * 例：'第4周 周四~周日、第5周 整周、第6周 周一~周二'
+ */
+export function describeHolidayPlan(days) {
+  if (!days || days.length === 0) return ''
+  const byWeek = new Map()
+  for (const d of days) {
+    if (!byWeek.has(d.week)) byWeek.set(d.week, [])
+    byWeek.get(d.week).push(d.day)
+  }
+  return [...byWeek.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([week, ds]) => {
+      const uniq = [...new Set(ds)].sort((a, b) => a - b)
+      if (uniq.length === 7) return '第' + week + '周 整周'
+      const label = uniq.length === 1
+        ? weekdayCN(uniq[0])
+        : weekdayCN(uniq[0]) + '~' + weekdayCN(uniq[uniq.length - 1])
+      return '第' + week + '周 ' + label
+    })
+    .join('、')
+}
+
+/**
  * 把 day_config 行里的放假记录整理成可展示列表（按周分组）
  * 仅认 is_workday === false 的行（显式放假）
  */

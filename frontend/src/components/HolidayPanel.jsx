@@ -15,7 +15,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase.js'
 import {
   isMonday, expandDateRange, toWeekDaySet, groupHolidayRows, weekdayCN,
-  inferSemesterStart, describeWeeks, formatMD
+  inferSemesterStart, describeWeeks, formatMD, describeHolidayPlan
 } from '../lib/holiday-dates.js'
 
 const LS_OVERRIDE = 'dsh_semester_start_override' // 仅当自动推算不准时使用
@@ -124,6 +124,10 @@ export default function HolidayPanel({ config, onChanged }) {
     } finally { setBusy(false) }
   }
 
+  // 实时预览：点「设为放假」之前就能核对周次（防止「当前周」没更新造成偏移）
+  const preview = (startDate && from && to) ? expandDateRange(from, to, startDate, totalWeeks) : null
+  const previewText = preview && !preview.error ? describeHolidayPlan(preview.days) : ''
+
   const grouped = groupHolidayRows(rows, startDate || null)
   const holidayCount = rows.filter(r => r.is_workday === false).length
 
@@ -177,6 +181,27 @@ export default function HolidayPanel({ config, onChanged }) {
         <button className="btn btn-primary" onClick={applyHoliday} disabled={busy}>{busy ? '处理中...' : '🌴 设为放假'}</button>
         <button className="btn btn-secondary" onClick={clearAssignments} disabled={busy || holidayCount === 0}>🧹 清理放假日的排班</button>
       </div>
+
+      {/* 放假预览：核对周次用 */}
+      {preview && (
+        <div style={{ fontSize: 13, marginBottom: 10, padding: '8px 12px', borderRadius: 6,
+          background: preview.error ? '#ffebee' : '#f1f8e9',
+          color: preview.error ? '#c62828' : '#33691e',
+          border: '1px solid ' + (preview.error ? '#ef9a9a' : '#c5e1a5') }}>
+          {preview.error ? (
+            <span>⚠️ {preview.error}</span>
+          ) : (
+            <span>
+              🔍 <strong>将设置 {preview.days.length} 天放假</strong>：{previewText || '（无）'}
+              {preview.outOfRange && preview.outOfRange.length > 0 ? '（另有 ' + preview.outOfRange.length + ' 天超出学期周数，会被忽略）' : ''}
+              <div style={{ marginTop: 4, color: '#7cb342', fontSize: 12 }}>
+                请核对上面的周次是否符合实际；若不对，说明「当前第 {currentWeek} 周」该更新了
+                （去「学期设置」修改，或点上方「推算不准？修正」）。
+              </div>
+            </span>
+          )}
+        </div>
+      )}
 
       {msg && (
         <div style={{ fontSize: 13, marginBottom: 10, padding: '8px 12px', borderRadius: 6,

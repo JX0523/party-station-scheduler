@@ -5,7 +5,7 @@
 import {
   parseYMD, toUTC, isMonday, utcWeekday, dateToWeekDay,
   formatMD, weekdayCN, expandDateRange, toWeekDaySet, groupHolidayRows,
-  addDays, inferSemesterStart, describeWeeks, todayYMD
+  addDays, inferSemesterStart, describeWeeks, todayYMD, describeHolidayPlan
 } from './frontend/src/lib/holiday-dates.js'
 import { runSchedulingAlgorithm } from './frontend/src/lib/scheduling-algorithm.js'
 
@@ -113,6 +113,28 @@ test('groupHolidayRows 归组并算出日期标签', () => {
   eq(g[0].week, 5)
   eq(g[0].days.map(d => d.day), [4, 5])
   eq(g[0].days[0].dateLabel, '10月1日')
+})
+
+console.log('\n📋 6.4 放假计划预览文案（防周次偏移）')
+test('13天连假的预览文案正确', () => {
+  const r = expandDateRange('2026-10-01', '2026-10-13', START, 18)
+  eq(describeHolidayPlan(r.days), '第5周 周四~周日、第6周 整周、第7周 周一~周二')
+})
+test('整周放假显示「整周」', () => {
+  const r = expandDateRange('2026-09-14', '2026-09-20', START, 18)
+  eq(describeHolidayPlan(r.days), '第3周 整周')
+})
+test('单日放假显示单个星期', () => {
+  const r = expandDateRange('2026-09-16', '2026-09-16', START, 18)
+  eq(describeHolidayPlan(r.days), '第3周 周三')
+})
+test('空输入返回空字符串', () => {
+  eq(describeHolidayPlan([]), ''); eq(describeHolidayPlan(null), '')
+})
+test('预览文案与周次集合一致（组合数吻合）', () => {
+  const r = expandDateRange('2026-10-19', '2026-10-30', START, 18)
+  const txt = describeHolidayPlan(r.days)
+  ok(txt.includes('第8周') && txt.includes('第9周'), '应包含第8、9周: ' + txt)
 })
 
 console.log('\n📋 6.5 自动推算第1周周一（无需用户输入）')

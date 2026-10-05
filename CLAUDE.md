@@ -153,6 +153,9 @@
   - **「第1周周一」自动推算**（`inferSemesterStart`，依据 current_week + 今天），无需管理员输入；
     推算不准时可在面板手动修正（localStorage 键 `dsh_semester_start_override`）；放假配置本身在云端
    - 「清理放假日的排班」只允许 `week_number >= current_week`（历史/已值完的周绝不改动）
+   - **绿色预览行（2026-10-05 新增）**：选完日期即显示「将设置 X 天放假：第N周 …」供写入前核对；
+     因为推算依赖 `current_week`，管理员忘记每周 +1 会让周次整体偏移一周——预览行是防错关键
+   - ⚠️ **每周一需把「学期设置」的当前周 +1**（唯一需要人工做的周期操作）
 12. **换电脑 / 灾备（2026-09-24 新增）**：
    - 资产位置：**数据在 Supabase 云端、代码+文档在 GitHub、部署在 Netlify/Pages**，均与个人电脑无关；
      唯一需在本地重建的是 `frontend/.env`（被 gitignore，值从 Supabase → Project Settings → API 取）
