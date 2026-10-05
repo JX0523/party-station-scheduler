@@ -156,7 +156,15 @@
    - **绿色预览行（2026-10-05 新增）**：选完日期即显示「将设置 X 天放假：第N周 …」供写入前核对；
      因为推算依赖 `current_week`，管理员忘记每周 +1 会让周次整体偏移一周——预览行是防错关键
    - ⚠️ **每周一需把「学期设置」的当前周 +1**（唯一需要人工做的周期操作）
-12. **换电脑 / 灾备（2026-09-24 新增）**：
+12. **成员在岗状态语义（2026-10-05 新增，改代码时必须保持一致）**：
+   - 排班/课表/统计**查询**用 `.eq('active', true)` **排除已停用**成员（Dashboard/Scheduling/CourseSchedule/Stats 的成员查询）
+   - **统计口径例外**：`Stats.jsx` 必须取**全部成员**（含已停用）——停用只是不排班，历史时长不能消失；
+     否则「停用成员」会让历史统计凭空减少（已在 2026-10-05 修复）
+   - 成员删除：外键 `ON DELETE CASCADE`，删人会**连带删除其全部值班记录**（含历史周）。
+     因此 UI 必须先查记录数并强警告，且推荐「停用」；`Members.jsx` 已有 停用/启用 按钮与勾选框
+   - 依赖安全：`xlsx` 固定为 **本地 vendor 的官方修复版 0.20.3**（`frontend/vendor/xlsx-0.20.3.tgz`，
+     npm 上的 0.18.5 有原型污染/ReDoS 高危漏洞）；升级需保留 vendor 方式，更新后跑 `node test-xlsx.mjs`
+13. **换电脑 / 灾备（2026-09-24 新增）**：
    - 资产位置：**数据在 Supabase 云端、代码+文档在 GitHub、部署在 Netlify/Pages**，均与个人电脑无关；
      唯一需在本地重建的是 `frontend/.env`（被 gitignore，值从 Supabase → Project Settings → API 取）
    - 工具：`tools/backup-data.mjs`（导出全部业务表 JSON）、`tools/restore-data.mjs`（带 --confirm 才写入）、

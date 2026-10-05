@@ -60,7 +60,7 @@ async function main() {
   const orphans = assignments.filter(a => !memById.has(a.member_id))
   log(`- 引用不存在成员: ${orphans.length === 0 ? '0 ✅' : orphans.length + ' ❌'}`)
   const inactive = assignments.filter(a => memById.has(a.member_id) && memById.get(a.member_id).active === false)
-  log(`- 排班指向已停用成员（统计会漏算）: ${inactive.length === 0 ? '0 ✅' : inactive.length + ' ⚠️'}`)
+  log(`- 排班指向已停用成员（2026-10-05 起统计页已包含其历史记录）: ${inactive.length} 条（属正常历史，不再视为异常）`)
   const schedSet = new Set(schedules.map(s => s.member_id + '|' + s.week_type))
   const noSched = members.filter(m => !schedSet.has(m.id + '|单周') || !schedSet.has(m.id + '|双周'))
   log(`- 缺少单周或双周课表的成员: ${noSched.length === 0 ? '0 ✅' : noSched.map(m => m.name).join(',') + ' ⚠️（视为全空闲）'}`)

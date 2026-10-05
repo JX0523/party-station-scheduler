@@ -28,10 +28,20 @@ export default function SemesterConfig() {
 
   async function handleSave() {
     setSaving(true)
+    // 保存前兜底钳制，防止「当前周 > 总周数」这类非法配置写入
+    const totalWeeks = Math.min(Math.max(parseInt(form.total_weeks) || 20, 1), 30)
+    const payload = {
+      ...form,
+      total_weeks: totalWeeks,
+      current_week: Math.min(Math.max(parseInt(form.current_week) || 1, 1), totalWeeks),
+    }
+    if (!payload.name || !String(payload.name).trim()) { setSaving(false); return showToast('请填写学期名称', 'error') }
     if (config) {
-      await supabase.from('semester_config').update(form).eq('id', config.id)
+      const { error } = await supabase.from('semester_config').update(payload).eq('id', config.id)
+      if (error) { setSaving(false); return showToast('保存失败：' + error.message, 'error') }
     } else {
-      const { data } = await supabase.from('semester_config').insert(form).select()
+      const { data, error } = await supabase.from('semester_config').insert(payload).select()
+      if (error) { setSaving(false); return showToast('保存失败：' + error.message, 'error') }
       if (data) setConfig(data[0])
     }
     setSaving(false)
@@ -40,8 +50,9 @@ export default function SemesterConfig() {
   }
 
   async function handleClearSchedules() {
-    if (!confirm('确定清空所有课表数据吗？此操作不可恢复！')) return
-    await supabase.from('course_schedules').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+    if (!confirm('确定清空所有课表数据吗？此操作不可恢复！\n\n（成员信息会保留，课表需要重新录入）')) return
+    const { error } = await supabase.from('course_schedules').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+    if (error) return showToast('清空失败：' + error.message, 'error')
     showToast('课表已清空', 'success')
   }
 
@@ -73,13 +84,13 @@ export default function SemesterConfig() {
           <label className="form-label">总周数</label>
           <input className="form-input" type="number" min="1" max="30"
             value={form.total_weeks}
-            onChange={e => setForm({ ...form, total_weeks: parseInt(e.target.value) || 20 })} />
+            onChange={e => { const v = parseInt(e.target.value) || 1; setForm({ ...form, total_weeks: Math.min(Math.max(v, 1), 30) }) }} />
         </div>
         <div className="form-group">
           <label className="form-label">当前是第几周？</label>
           <input className="form-input" type="number" min="1" max={form.total_weeks || 30}
             value={form.current_week}
-            onChange={e => setForm({ ...form, current_week: parseInt(e.target.value) || 1 })} />
+            onChange={e => { const v = parseInt(e.target.value) || 1; const maxW = form.total_weeks || 30; setForm({ ...form, current_week: Math.min(Math.max(v, 1), maxW) }) }} />
           <p style={{ fontSize: 12, color: '#999', marginTop: 4 }}>
             当前周及之前的排班将被锁定，不可重新生成。每周结束后请更新当前周。
           </p>

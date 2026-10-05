@@ -28,13 +28,14 @@ export default function Stats() {
 
     if (viewMode === 'week') {
       // 按周统计
-      const { data: members } = await supabase.from('members').select('*').eq('active', true).order('role').order('name')
+      // 取全部成员：已停用成员的历史值班记录也必须计入统计（否则一停用，历史时长就消失了）
+      const { data: members } = await supabase.from('members').select('*').order('role').order('name')
       const { data: assignments } = await supabase.from('assignments')
         .select('*').eq('week_number', selectedWeek)
 
       const memberMap = {}
       if (members) members.forEach(m => {
-        memberMap[m.id] = { name: m.name, role: m.role, normalHours: 0, leaveCount: 0 }
+        memberMap[m.id] = { name: m.name, role: m.role, active: m.active !== false, normalHours: 0, leaveCount: 0 }
       })
       if (assignments) {
         assignments.forEach(a => {
@@ -52,18 +53,19 @@ export default function Stats() {
       const result = Object.entries(memberMap).map(([id, info]) => ({
         id, ...info,
         totalHours: info.normalHours  // 总时长 = 正常时长（请假不计）
-      })).filter(s => s.totalHours > 0 || s.leaveCount > 0)
+      })).filter(s => s.totalHours > 0 || s.leaveCount > 0 || s.active === false)
         .sort((a, b) => b.totalHours - a.totalHours || b.leaveCount - a.leaveCount)
 
       setStats(result)
     } else {
       // 整学期汇总
-      const { data: members } = await supabase.from('members').select('*').eq('active', true).order('role').order('name')
+      // 同上：含已停用成员，保证历史统计完整
+      const { data: members } = await supabase.from('members').select('*').order('role').order('name')
       const { data: assignments } = await supabase.from('assignments').select('*')
 
       const memberMap = {}
       if (members) members.forEach(m => {
-        memberMap[m.id] = { name: m.name, role: m.role, normalHours: 0, leaveCount: 0 }
+        memberMap[m.id] = { name: m.name, role: m.role, active: m.active !== false, normalHours: 0, leaveCount: 0 }
       })
       if (assignments) {
         assignments.forEach(a => {
@@ -81,7 +83,8 @@ export default function Stats() {
       const result = Object.entries(memberMap).map(([id, info]) => ({
         id, ...info,
         totalHours: info.normalHours  // 总时长 = 正常时长（请假不计）
-      })).sort((a, b) => b.totalHours - a.totalHours || b.leaveCount - a.leaveCount)
+      })).filter(s => s.active !== false || s.totalHours > 0 || s.leaveCount > 0)
+        .sort((a, b) => b.totalHours - a.totalHours || b.leaveCount - a.leaveCount)
 
       setStats(result)
     }
@@ -92,6 +95,7 @@ export default function Stats() {
     const data = stats.map(s => ({
       '姓名': s.name,
       '角色': s.role,
+      '状态': s.active === false ? '已停用' : '在职',
       '正常值班时长(小时)': s.normalHours,
       '请假次数': s.leaveCount,
       '实际总时长(小时)': s.totalHours,
@@ -156,6 +160,11 @@ export default function Stats() {
         </div>
       </div>
 
+      <p style={{ fontSize: 12, color: '#999', marginBottom: 8 }}>
+        💡 说明：已停用（退出）成员的历史值班记录仍计入统计与导出，并标注「已停用」；
+        停用只是不再参与自动排班。
+      </p>
+
       <div className="card">
         {loading ? <p>加载中...</p> : (
           <div className="table-wrapper">
@@ -172,8 +181,13 @@ export default function Stats() {
                 {stats.length === 0 ? (
                   <tr><td colSpan={4} style={{ padding: 40, color: '#999' }}>暂无统计数据</td></tr>
                 ) : stats.map(s => (
-                  <tr key={s.id}>
-                    <td><strong>{s.name}</strong></td>
+                  <tr key={s.id} style={s.active === false ? { opacity: 0.6 } : undefined}>
+                    <td>
+                      <strong>{s.name}</strong>
+                      {s.active === false && (
+                        <span className="badge" style={{ background: '#999', color: '#fff', marginLeft: 6, fontSize: 11 }}>已停用</span>
+                      )}
+                    </td>
                     <td><span className={`badge ${s.role === '部员' ? 'badge-red' : s.role === '部长' ? 'badge-gold' : 'badge-green'}`}>{s.role}</span></td>
                     <td>{s.normalHours.toFixed(1)}</td>
                     <td style={{ color: s.leaveCount > 0 ? '#E65100' : '#999' }}>
