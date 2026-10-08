@@ -14,31 +14,40 @@ jobs:
         with:
           node-version: 20
 
-      - name: 运行全部测试（纯 Node，无需安装依赖）
-        run: |
-          set -e
-          total=0
-          for f in test-*.mjs; do
-            echo "━━━ $f ━━━"
-            out=$(node "$f" 2>&1)
-            echo "$out" | tail -3
-            if ! echo "$out" | grep -qE '[0-9]+/[0-9]+ 通过'; then
-              echo "::error file=$f::未找到测试结果汇总，可能崩溃"
-              exit 1
-            fi
-            pass=$(echo "$out" | grep -oE '[0-9]+/[0-9]+ 通过' | tail -1 | cut -d/ -f1)
-            all=$(echo "$out" | grep -oE '[0-9]+/[0-9]+ 通过' | tail -1 | cut -d/ -f2 | cut -d' ' -f1)
-            if [ "$pass" != "$all" ]; then
-              echo "::error file=$f::$pass/$all 通过，存在失败用例"
-              exit 1
-            fi
-            total=$((total + all))
-          done
-          echo "✅ 全部测试通过，共 $total 项"
-
       - name: 安装依赖
         working-directory: frontend
         run: npm ci
+
+      - name: 运行全部测试
+        run: |
+          total=0; failed=0
+          for f in test-*.mjs; do
+            echo "━━━━━━ $f ━━━━━━"
+            out=$(node "$f" 2>&1); code=$?
+            echo "$out" | tail -4
+            if [ $code -ne 0 ]; then
+              echo "::error file=$f::$f 执行失败（退出码 $code）"
+              failed=$((failed + 1)); continue
+            fi
+            summary=$(echo "$out" | grep -oE '[0-9]+/[0-9]+ 通过' | tail -1)
+            if [ -z "$summary" ]; then
+              echo "::error file=$f::未找到测试汇总输出"
+              failed=$((failed + 1)); continue
+            fi
+            pass=${summary%%/*}
+            all=$(echo "$summary" | cut -d/ -f2 | cut -d' ' -f1)
+            if [ "$pass" != "$all" ]; then
+              echo "::error file=$f::$pass/$all 通过，存在失败用例"
+              failed=$((failed + 1)); continue
+            fi
+            total=$((total + all))
+          done
+          echo ""
+          if [ $failed -ne 0 ]; then
+            echo "❌ 有 $failed 个测试套件失败"
+            exit 1
+          fi
+          echo "✅ 全部测试通过，共 $total 项"
 
       - name: 生产构建
         working-directory: frontend

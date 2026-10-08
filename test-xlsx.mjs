@@ -4,7 +4,17 @@
  *      必须验证「统计导出」与「成员Excel导入」两条路径完全正常。
  * 运行: node test-xlsx.mjs
  */
-import * as XLSX from './frontend/node_modules/xlsx/xlsx.mjs'
+// xlsx 位于 frontend/node_modules（由 npm ci 安装，或从 vendor 目录解出）。
+// 若未安装依赖，则优雅跳过本套件，保证「根目录测试无需依赖」这一特性依然成立。
+let XLSX = null
+for (const spec of ['./frontend/node_modules/xlsx/xlsx.mjs', 'xlsx']) {
+  try { XLSX = await import(spec); break } catch { /* 继续尝试下一个 */ }
+}
+if (!XLSX) {
+  console.log('⚠️  未找到 xlsx 依赖，跳过 Excel 测试套件。')
+  console.log('   如需运行： cd frontend && npm ci   然后重新执行本脚本。')
+  process.exit(0)
+}
 import fs from 'fs'
 import path from 'path'
 
