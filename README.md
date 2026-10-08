@@ -74,9 +74,11 @@ npm run dev          # 开发服务器 http://localhost:5173
 npm run build        # 生产构建
 npm run lint         # 代码检查（必须 0 error）
 
-# 跑全部测试（在项目根目录，无需安装任何依赖）
+# 跑全部测试（在项目根目录）
 Get-ChildItem test-*.mjs | ForEach-Object { node $_ }   # PowerShell
 for f in test-*.mjs; do node "$f"; done               # bash
+# 说明：未安装依赖时，仅 test-xlsx.mjs 会自动跳过（打印提示），其余 9 个套件纯 Node 可跑；
+#      执行 npm ci 后再跑，即可获得完整 324 项。
 ```
 
 **完整复现步骤**（含 Supabase 建表、演示数据、创建账号）：见 [CONTRIBUTING.md](CONTRIBUTING.md) 第一节。

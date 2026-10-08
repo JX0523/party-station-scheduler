@@ -42,9 +42,12 @@ npm run dev      # http://localhost:5173
 ## 二、改动前请先跑测试（本项目约定）
 
 ```bash
-# 在仓库根目录，无需安装依赖（纯 Node 脚本）
+# 在仓库根目录（纯 Node 脚本，多数套件无需安装依赖）
 Get-ChildItem test-*.mjs | ForEach-Object { node $_ }    # PowerShell
 for f in test-*.mjs; do node "$f"; done                   # bash
+
+# 注意：test-xlsx.mjs 需要 frontend/node_modules 里的 xlsx（由 vendor 安装）；
+#      未执行 npm ci 时它会打印提示并自动跳过，不会报错。
 ```
 
 当前基线：**10 个套件 / 324 项用例，全部通过**。你的改动**不应让任何一项失败**。
