@@ -50,7 +50,7 @@ for f in test-*.mjs; do node "$f"; done                   # bash
 #      未执行 npm ci 时它会打印提示并自动跳过，不会报错。
 ```
 
-当前基线：**10 个套件 / 324 项用例，全部通过**。你的改动**不应让任何一项失败**。
+当前基线：**340 项检查全部通过**（324 项纯 Node 单元测试 + 16 项运行时冒烟渲染）。你的改动**不应让任何一项失败**。
 
 | 套件 | 覆盖内容 |
 |------|---------|
@@ -60,11 +60,15 @@ for f in test-*.mjs; do node "$f"; done                   # bash
 | `test-edge-cases.mjs` | 极端输入、功能叠加、并发边界 |
 | `test-xlsx.mjs` | Excel 导入/导出（xlsx 0.20.3） |
 | `test-full-semester.mjs` / `test-comprehensive.mjs` | 整学期模拟与综合场景 |
+| `test-runtime-smoke.mjs` | **运行时冒烟**：加载构建产物、用 jsdom 逐页真实渲染（需先 build，缺失时自动跳过） |
 
 ```bash
-# 构建与代码检查
+# 构建、运行时冒烟测试与代码检查
 cd frontend
 npm run build
+cd ..
+node test-runtime-smoke.mjs   # 加载构建产物，逐页真实渲染（页面级崩溃会在此暴露）
+cd frontend
 npm run lint     # 必须 0 error（warning 允许）
 ```
 

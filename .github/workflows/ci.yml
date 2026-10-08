@@ -49,9 +49,19 @@ jobs:
           fi
           echo "✅ 全部测试通过，共 $total 项"
 
+      - name: 准备环境变量（CI 使用占位值；真实值由 deploy.yml 从 Secrets 注入）
+        run: |
+          if [ ! -f frontend/.env ]; then
+            echo 'VITE_SUPABASE_URL=https://demo-project.supabase.co' > frontend/.env
+            echo 'VITE_SUPABASE_ANON_KEY=demo-anon-key-for-ci' >> frontend/.env
+          fi
+
       - name: 生产构建
         working-directory: frontend
         run: npm run build
+
+      - name: 运行时冒烟测试（真实加载构建产物，逐页渲染）
+        run: node test-runtime-smoke.mjs
 
       - name: 代码检查（必须 0 error）
         working-directory: frontend

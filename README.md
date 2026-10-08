@@ -3,7 +3,7 @@
 [![CI](https://github.com/JX0523/party-station-scheduler/actions/workflows/ci.yml/badge.svg)](https://github.com/JX0523/party-station-scheduler/actions/workflows/ci.yml)
 [![Deploy](https://github.com/JX0523/party-station-scheduler/actions/workflows/deploy.yml/badge.svg)](https://github.com/JX0523/party-station-scheduler/actions/workflows/deploy.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-![Tests](https://img.shields.io/badge/tests-324%20passed-brightgreen)
+![Tests](https://img.shields.io/badge/tests-340%20passed-brightgreen)
 
 为大学党员工作站设计的 **Web 排班管理系统**：管理员在浏览器上完成成员管理、课表录入、自动排班、请假替补、**按日期放假**、值班统计等全流程工作，替代手工排班。
 
@@ -41,7 +41,7 @@
 | 数据 | Supabase：PostgreSQL 15、Auth（邮箱密码）、RLS 行级安全 |
 | 导出 | SheetJS (xlsx) |
 | 部署 | GitHub Pages + Netlify，GitHub Actions 自动构建 |
-| 测试 | 纯 Node 单元测试（**10 个套件 / 324 项**，无需安装依赖即可运行） |
+| 测试 | 单元测试 + 运行时冒烟测试（**340 项检查**：324 项纯 Node 无依赖 + 16 项 jsdom 页面渲染） |
 
 ## 项目结构
 
@@ -58,7 +58,7 @@
 │   ├── src/pages/  src/components/          # 页面与组件
 │   └── vendor/xlsx-0.20.3.tgz               # 内置修复版依赖（离线可装）
 ├── database/                                # schema.sql + 迁移脚本 + seed-demo.sql（演示数据）
-├── test-*.mjs                               # 10 个测试套件（324 项，纯 Node，无需依赖）
+├── test-*.mjs                               # 11 个测试套件（340 项检查：单元 + 运行时渲染）
 ├── tools/                                   # 运维脚本：系统审计 / 数据备份 / 数据恢复
 └── .github/                                 # CI、部署、保活、Issue/PR 模板
 ```
@@ -77,8 +77,8 @@ npm run lint         # 代码检查（必须 0 error）
 # 跑全部测试（在项目根目录）
 Get-ChildItem test-*.mjs | ForEach-Object { node $_ }   # PowerShell
 for f in test-*.mjs; do node "$f"; done               # bash
-# 说明：未安装依赖时，仅 test-xlsx.mjs 会自动跳过（打印提示），其余 9 个套件纯 Node 可跑；
-#      执行 npm ci 后再跑，即可获得完整 324 项。
+# 说明：未安装依赖时，test-xlsx.mjs 与 test-runtime-smoke.mjs 会自动跳过（打印提示），
+#      其余套件纯 Node 可跑；执行 npm ci && npm run build 后再跑，即得完整 340 项。
 ```
 
 **完整复现步骤**（含 Supabase 建表、演示数据、创建账号）：见 [CONTRIBUTING.md](CONTRIBUTING.md) 第一节。
@@ -125,7 +125,8 @@ GitHub Actions 部署时通过仓库 Secrets 注入：`VITE_SUPABASE_URL`、`VIT
 | test-fixed-behaviors.mjs | 11 | 关键修复回归 |
 | test-full-semester.mjs | 14 | 整学期模拟 |
 | test-phase1-fix.mjs | 34 | 课表冲突与调休 |
-| **合计** | **324** | 全部通过（CI 每次提交都会跑） |
+| test-runtime-smoke.mjs | 16 | **运行时冒烟**：加载构建产物，逐页真实渲染（7 个页面）+ 未登录场景 |
+| **合计** | **340** | 全部通过（CI 每次提交都会跑） |
 
 ## 已知注意点
 
