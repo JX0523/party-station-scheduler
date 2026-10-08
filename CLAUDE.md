@@ -60,9 +60,10 @@
 
 > 💡 **Netlify 部署 403 速查**：若 deploy-netlify 步骤报 Forbidden，多半是 Netlify 免费额度
 > （300 积分/月，约每月 25 日重置）已用尽——Netlify 会封禁一切新部署（含 API 上传）。
-> 错误详情可通过 Actions → Netlify Auto-Fix → Run workflow 诊断，或看 Netlify Deploys 页。
-> 此期间 GitHub Pages 照常更新；积分重置后部署自动恢复。注意保持站点 stop_builds=true，
-> 避免 Netlify 自动构建双倍烧积分（详见 netlify-autofix-report.txt 与 dev-logs/2026-08-21.md）。
+> 排查方式：看 Netlify Deploys 页，或用 Netlify API `GET /api/v1/sites/{site_id}/build_settings` 查配置
+> （一次性的 netlify-autofix 工作流与报告文件已于 2026-10-05 清理，结论已归档到 dev-logs）。
+> 此期间 GitHub Pages 照常更新；积分重置后部署自动恢复。**务必保持站点 stop_builds=true**，
+> 避免 Netlify 连 GitHub 自动构建造成双倍消耗（历史结论见 dev-logs/2026-08-21.md、2026-09-24.md）。
 
 ## 项目结构
 
