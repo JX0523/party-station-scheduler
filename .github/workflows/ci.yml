@@ -12,7 +12,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22   # jsdom 30（运行时冒烟测试）需要 Node 22+
 
       - name: 安装依赖
         working-directory: frontend
