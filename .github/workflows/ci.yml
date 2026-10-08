@@ -1,0 +1,54 @@
+# 持续集成：每次推送/PR 自动跑测试、构建、代码检查（无需任何密钥）
+name: CI
+on:
+  push:            # 所有分支（含 master）：每次提交都跑测试与构建
+  pull_request:    # 任何 PR 都会跑，作为合并前的质量门禁
+  workflow_dispatch:
+jobs:
+  test:
+    name: 测试 / 构建 / 代码检查
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 运行全部测试（纯 Node，无需安装依赖）
+        run: |
+          set -e
+          total=0
+          for f in test-*.mjs; do
+            echo "━━━ $f ━━━"
+            out=$(node "$f" 2>&1)
+            echo "$out" | tail -3
+            if ! echo "$out" | grep -qE '[0-9]+/[0-9]+ 通过'; then
+              echo "::error file=$f::未找到测试结果汇总，可能崩溃"
+              exit 1
+            fi
+            pass=$(echo "$out" | grep -oE '[0-9]+/[0-9]+ 通过' | tail -1 | cut -d/ -f1)
+            all=$(echo "$out" | grep -oE '[0-9]+/[0-9]+ 通过' | tail -1 | cut -d/ -f2 | cut -d' ' -f1)
+            if [ "$pass" != "$all" ]; then
+              echo "::error file=$f::$pass/$all 通过，存在失败用例"
+              exit 1
+            fi
+            total=$((total + all))
+          done
+          echo "✅ 全部测试通过，共 $total 项"
+
+      - name: 安装依赖
+        working-directory: frontend
+        run: npm ci
+
+      - name: 生产构建
+        working-directory: frontend
+        run: npm run build
+
+      - name: 代码检查（必须 0 error）
+        working-directory: frontend
+        run: npm run lint
+
+      - name: 依赖安全审计（仅报告，不阻塞）
+        working-directory: frontend
+        continue-on-error: true
+        run: npm audit --omit=dev || true

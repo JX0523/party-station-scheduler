@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { useState, useEffect, createContext, useContext } from 'react'
+import { useState, useEffect, createContext } from 'react'
 import { supabase } from './lib/supabase.js'
 import Layout from './components/Layout.jsx'
 import Login from './pages/Login.jsx'
@@ -11,6 +11,9 @@ import Scheduling from './pages/Scheduling.jsx'
 import Stats from './pages/Stats.jsx'
 import SemesterConfig from './pages/SemesterConfig.jsx'
 
+// 说明：AuthContext 与 App 组件放在同一文件（便于理解整体结构）；
+// 这会让 Vite 的 Fast Refresh 对整个文件做整页刷新，属于可接受的取舍。
+// eslint-disable-next-line react-refresh/only-export-components
 export const AuthContext = createContext(null)
 
 function App() {

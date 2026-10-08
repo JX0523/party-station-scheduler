@@ -19,10 +19,6 @@ export default function DaySelector({ weekNumber, locked, onChange }) {
   const [dayConfig, setDayConfig] = useState({})
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => {
-    loadDayConfig()
-  }, [weekNumber])
-
   async function loadDayConfig() {
     const { data } = await supabase
       .from('day_config')
@@ -46,6 +42,11 @@ export default function DaySelector({ weekNumber, locked, onChange }) {
     setDayConfig(map)
     if (onChange) onChange(map)
   }
+
+  // 副作用放在函数声明之后（运行时行为不变，仅满足 lint 规则）
+  useEffect(() => {
+    loadDayConfig()
+  }, [weekNumber])
 
   async function toggle(day) {
     if (locked) return

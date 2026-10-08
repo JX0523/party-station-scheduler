@@ -9,12 +9,6 @@ export default function Stats() {
   const [selectedWeek, setSelectedWeek] = useState(1)
   const [semesterConfig, setSemesterConfig] = useState(null)
 
-  useEffect(() => {
-    loadConfig()
-  }, [])
-
-  useEffect(() => { loadStats() }, [viewMode, selectedWeek])
-
   async function loadConfig() {
     const { data: sem } = await supabase.from('semester_config').select('*').limit(1).single()
     setSemesterConfig(sem)
@@ -90,6 +84,13 @@ export default function Stats() {
     }
     setLoading(false)
   }
+
+  // 副作用放在函数声明之后：避免 eslint「变量在声明前被访问」告警（运行时行为不变）
+  useEffect(() => {
+    loadConfig()
+  }, [])
+
+  useEffect(() => { loadStats() }, [viewMode, selectedWeek])
 
   function handleExport() {
     const data = stats.map(s => ({

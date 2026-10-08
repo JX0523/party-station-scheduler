@@ -1,6 +1,14 @@
 # 党员工作站排班系统
 
-为大学党员工作站设计的 **Web 排班管理系统**：管理员在浏览器上完成成员管理、课表录入、自动排班、请假替补、值班统计等全流程工作，替代手工排班。
+[![CI](https://github.com/JX0523/party-station-scheduler/actions/workflows/ci.yml/badge.svg)](https://github.com/JX0523/party-station-scheduler/actions/workflows/ci.yml)
+[![Deploy](https://github.com/JX0523/party-station-scheduler/actions/workflows/deploy.yml/badge.svg)](https://github.com/JX0523/party-station-scheduler/actions/workflows/deploy.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+![Tests](https://img.shields.io/badge/tests-324%20passed-brightgreen)
+
+为大学党员工作站设计的 **Web 排班管理系统**：管理员在浏览器上完成成员管理、课表录入、自动排班、请假替补、**按日期放假**、值班统计等全流程工作，替代手工排班。
+
+> 🚀 **想自己搭一套 / 二次开发？** 见 [CONTRIBUTING.md](CONTRIBUTING.md)（含 5 分钟复现步骤与演示数据 `database/seed-demo.sql`）。
+> 🤖 **用 AI 助手改代码？** 先读 [CLAUDE.md](CLAUDE.md)（项目硬性约定）。
 
 ## 线上地址
 
@@ -19,6 +27,9 @@
 - **自动排班算法**：两阶段（每日覆盖 + 轮询补充），兼顾公平与连续性
 - **请假替补**：标记请假 → 推荐替补 → 下周自动优先补排
 - **调休/放假**：每周可配置工作日，周末调休可映射「补周几」的课表
+- **按日期放假**（2026-09 新增）：选起止日期即可批量放假（支持连放多天），放假当天不排班；
+  周次自动推算 + 写入前预览核对，可一键清理放假日的排班
+- **成员停用**：退出成员可「停用」而非删除——不再参与排班，**历史记录与统计全部保留**
 - **一般/紧急模式**：紧急模式允许连续值班，人手紧张时兜底
 - **统计导出**：按周/整学期汇总值班时长，导出 Excel
 
@@ -30,35 +41,46 @@
 | 数据 | Supabase：PostgreSQL 15、Auth（邮箱密码）、RLS 行级安全 |
 | 导出 | SheetJS (xlsx) |
 | 部署 | GitHub Pages + Netlify，GitHub Actions 自动构建 |
-| 测试 | 纯 Node 单元测试（254 项，无需安装依赖即可运行） |
+| 测试 | 纯 Node 单元测试（**10 个套件 / 324 项**，无需安装依赖即可运行） |
 
 ## 项目结构
 
 ```
 党员工作站排班系统/
-├── CLAUDE.md                 # AI 开发指引（改代码前必读）
-├── README.md                 # 本文件
-├── CHANGELOG.md              # 发布记录
-├── docs/                     # 需求/技术/设计/执行计划 + git 工作流
-├── dev-logs/                 # 每日开发日志
-├── frontend/                 # React 前端（唯一代码仓库主体）
-├── database/                 # 建表 SQL + 迁移脚本
-├── test-*.mjs                # 7 个测试套件（254 项）
-└── .github/workflows/        # 部署 + Supabase 保活
+├── README.md / CHANGELOG.md / LICENSE       # 说明、变更记录、MIT 许可证
+├── CONTRIBUTING.md / CODE_OF_CONDUCT.md     # 贡献指南、行为准则
+├── CLAUDE.md                                # AI 开发指引（改代码前必读）
+├── 使用手册.md / 排班操作速查指南.md          # 面向使用者
+├── docs/                                    # 需求/技术/设计/执行计划/git 工作流/迁移灾备
+├── dev-logs/                                # 每日开发日志（含每次改动的来龙去脉）
+├── frontend/                                # React 前端
+│   ├── src/lib/                             # 纯函数：排班算法、日期换算（已单测）
+│   ├── src/pages/  src/components/          # 页面与组件
+│   └── vendor/xlsx-0.20.3.tgz               # 内置修复版依赖（离线可装）
+├── database/                                # schema.sql + 迁移脚本 + seed-demo.sql（演示数据）
+├── test-*.mjs                               # 10 个测试套件（324 项，纯 Node，无需依赖）
+├── tools/                                   # 运维脚本：系统审计 / 数据备份 / 数据恢复
+└── .github/                                 # CI、部署、保活、Issue/PR 模板
 ```
 
-## 本地开发
+## 本地开发 / 复现
 
 ```bash
-cd frontend
-npm install
-npm run dev          # 开发服务器
+git clone https://github.com/JX0523/party-station-scheduler.git
+cd party-station-scheduler/frontend
+npm ci               # 网络慢可加 --registry=https://registry.npmmirror.com
+cp .env.example .env # 填入自己的 Supabase URL 与 anon key
+npm run dev          # 开发服务器 http://localhost:5173
 npm run build        # 生产构建
+npm run lint         # 代码检查（必须 0 error）
 
-# 跑全部测试（在项目根目录，无需装依赖）
+# 跑全部测试（在项目根目录，无需安装任何依赖）
 Get-ChildItem test-*.mjs | ForEach-Object { node $_ }   # PowerShell
 for f in test-*.mjs; do node "$f"; done               # bash
 ```
+
+**完整复现步骤**（含 Supabase 建表、演示数据、创建账号）：见 [CONTRIBUTING.md](CONTRIBUTING.md) 第一节。
+演示数据：在 Supabase SQL Editor 执行 `database/seed-demo.sql`，即可得到 6 名成员 + 课表 + 一周排班。
 
 ## 环境变量
 
@@ -94,10 +116,14 @@ GitHub Actions 部署时通过仓库 Secrets 注入：`VITE_SUPABASE_URL`、`VIT
 | test-algorithm.mjs | 27 | 算法核心场景 |
 | test-basic-functionality.mjs | 59 | 基础功能 |
 | test-comprehensive.mjs | 49 | 综合用户场景 |
-| test-equivalence-classes.mjs | 60 | 等价类全覆盖 |
-| test-fixed-behaviors.mjs | 11 | 2026-08-14 修复回归 |
-| test-full-semester.mjs | 14 | 16 周全学期模拟 |
+| test-equivalence-classes.mjs | 62 | 等价类全覆盖（工作日/角色配额/调休/整周放假） |
+| test-edge-cases.mjs | 20 | 极端输入、功能叠加、并发边界 |
+| test-holiday-dates.mjs | 40 | 放假：日期换算、自动推算、预览文案、不排班 |
+| test-xlsx.mjs | 8 | Excel 导入/导出往返（xlsx 0.20.3） |
+| test-fixed-behaviors.mjs | 11 | 关键修复回归 |
+| test-full-semester.mjs | 14 | 整学期模拟 |
 | test-phase1-fix.mjs | 34 | 课表冲突与调休 |
+| **合计** | **324** | 全部通过（CI 每次提交都会跑） |
 
 ## 已知注意点
 
@@ -105,7 +131,22 @@ GitHub Actions 部署时通过仓库 Secrets 注入：`VITE_SUPABASE_URL`、`VIT
 - `required_count=0` 表示该时段不需要值班；某天全 0 则不排班
 - 小团队（<20 人）在一般模式下会出现隔周人数波动，属「不连续值班」的必然结果，必要时切紧急模式
 - 新增数据库变更：先改 `database/schema.sql`，再写 `migration-vX-*.sql`，最后登记到 tech-spec 第 7 节
+  （**新建表必须显式 `GRANT`**，否则前端报 `permission denied`，详见 CLAUDE.md 第 8 条）
+- **成员在岗状态语义**：排班/课表查询排除已停用成员；**统计必须包含全部成员**（停用者历史不能丢）；
+  删除成员会 `ON DELETE CASCADE` 连带删除其历史排班，界面已加警告并推荐「停用」
+- 放假配置复用 `day_config`（`is_workday=false`），**整周全放假 = 该周不排班**；
+  日期→周次依赖「学期设置」的当前周，页面有推算提示与预览行，**每周记得把当前周 +1**
 
 ---
 
-> 最后更新：2026-08-14 ｜ 潘佳欣（B23042125）毕业设计项目
+## 开源与贡献
+
+- **许可证**：[MIT](LICENSE) —— 可自由使用、修改、分发（保留版权声明即可）
+- **贡献**：欢迎提交 Issue / PR，请先读 [CONTRIBUTING.md](CONTRIBUTING.md)；
+  提交前跑一遍测试与 `npm run build`（CI 也会检查）
+- **数据与隐私**：仓库中**不含任何真实成员数据**（姓名/电话/排班都在你自己的 Supabase 项目里）；
+  `.gitignore` 已排除 `.env` 与数据备份目录，请勿把个人数据提交到公开仓库
+
+---
+
+> 最后更新：2026-10-05 ｜ 潘佳欣（B23042125）毕业设计项目

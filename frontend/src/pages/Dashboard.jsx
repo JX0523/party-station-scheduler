@@ -29,8 +29,6 @@ export default function Dashboard() {
     () => localStorage.getItem('dsh_notice_holiday_v1') !== 'hidden'
   )
 
-  useEffect(() => { loadAll() }, [])
-
   // 把 day_config 行构建成算法需要的 rich 格式（与 DaySelector 组件保持一致）
   function buildDayConfigMap(rows) {
     const map = {}
@@ -101,6 +99,9 @@ export default function Dashboard() {
       }
     }
   }
+
+  // 首次加载放在函数声明之后（运行时行为不变，仅满足 lint 规则）
+  useEffect(() => { loadAll() }, [])
 
   async function autoGenerate(sem, scMap, dcMap) {
     if (generatingRef.current) return  // 防止并发生成
