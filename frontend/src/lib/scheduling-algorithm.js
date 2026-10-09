@@ -201,10 +201,14 @@ export function runSchedulingAlgorithm({
       // 连续性约束：一般模式排除上周已值班的人。
       // 补排人员（makeUpIds）例外——上周请假的人本周必须优先补排；
       // 紧急模式完全跳过连续性约束。
-      if (!isEmergency && lastWeekIds.has(m.id) && !makeUpIds.has(m.id)) return false
-      if (m.role === '主席团' && !needZhuXi) return false
+      // 补排优先（文档 requirements §5.4 第 1 条）：补排人员的优先级高于「角色配额」，
+      // 因此补排人员豁免 continuity / 主席团限制 / 角色配额——否则主席团成员请假后
+      // 在「部长够用」的周里会被角色配额挡掉，补排静默失效（2026-10-09 修复）。
+      const isMakeUp = makeUpIds.has(m.id)
+      if (!isEmergency && lastWeekIds.has(m.id) && !isMakeUp) return false
+      if (m.role === '主席团' && !needZhuXi && !isMakeUp) return false
       const cap = maxPerRoleThisWeek[m.role]
-      if (cap !== undefined && (roleCountThisWeek[m.role] || 0) >= cap) return false
+      if (!isMakeUp && cap !== undefined && (roleCountThisWeek[m.role] || 0) >= cap) return false
       if (extraFilter && !extraFilter(m)) return false
       return true
     })

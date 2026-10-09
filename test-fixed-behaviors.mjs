@@ -318,6 +318,54 @@ test('紧急模式仍遵守每人每周最多1次', () => {
 })
 
 // ============================================================
+// 2026-10-09 修复：补排人员豁免「角色配额 / 主席团限制」
+// 背景：真实系统里 部员+部长 >= 5 → needZhuXi=false → 主席团配额=0，
+//      若主席团成员上周请假（需补排），会被配额挡住，补排静默失效。
+// ============================================================
+console.log('\n📋 2026-10-09 修复回归：补排优先于角色配额')
+
+test('主席团成员需补排时，即使主席团配额为0 也必须排上', () => {
+  // 4 部员 + 2 部长 >= 5 → 不需要主席团（配额 0）
+  const members = makeMembers({ '部员': 4, '部长': 2, '主席团': 1 })
+  const zhuXi = members.find(m => m.role === '主席团')
+  const r = runSchedulingAlgorithm({
+    members, schedules: makeEmptySchedules(members), slotConfig: makeSlotConfig(),
+    weekNumber: 2, lastWeek: [], allAssignments: [],
+    makeUpMembers: [{ member_id: zhuXi.id }],   // 上周请假的正是这位主席团成员
+    otherWeekSchedules: [], dayConfig: null, weekType: '单周', mode: '一般'
+  })
+  ok(r.meta.perRoleMax['主席团'] === 0, '前提：本周主席团配额应为 0，实际 ' + r.meta.perRoleMax['主席团'])
+  ok(r.assignments.some(a => a.member_id === zhuXi.id), '补排的主席团成员应被排上')
+})
+
+test('补排人员同时在上周已排列表中，也优先于配额（一般模式）', () => {
+  const members = makeMembers({ '部员': 4, '部长': 2, '主席团': 2 })
+  const zx = members.filter(m => m.role === '主席团')
+  const r = runSchedulingAlgorithm({
+    members, schedules: makeEmptySchedules(members), slotConfig: makeSlotConfig(),
+    weekNumber: 3,
+    lastWeek: zx.map(m => ({ member_id: m.id })),  // 出现在 lastWeek（上周值过/请假过）
+    allAssignments: [],
+    makeUpMembers: zx.map(m => ({ member_id: m.id })),
+    otherWeekSchedules: [], dayConfig: null, weekType: '单周', mode: '一般'
+  })
+  const got = zx.filter(m => r.assignments.some(a => a.member_id === m.id))
+  ok(got.length >= 1, '至少应有 1 位补排的主席团成员被排上，实际 ' + got.length)
+})
+
+test('豁免配额不会突破每周总人次上限', () => {
+  const members = makeMembers({ '部员': 4, '部长': 2, '主席团': 3 })
+  const r = runSchedulingAlgorithm({
+    members, schedules: makeEmptySchedules(members), slotConfig: makeSlotConfig(),
+    weekNumber: 2, lastWeek: [], allAssignments: [],
+    makeUpMembers: members.map(m => ({ member_id: m.id })),
+    otherWeekSchedules: [], dayConfig: null, weekType: '单周', mode: '一般'
+  })
+  ok(r.assignments.length <= r.meta.maxPerWeek,
+    '总人次 ' + r.assignments.length + ' 不应超过上限 ' + r.meta.maxPerWeek)
+})
+
+// ============================================================
 console.log('\n' + '='.repeat(60))
 console.log('🏆 修复回归测试结果: ' + passed + '/' + (passed + failed) + ' 通过')
 if (failed === 0) {

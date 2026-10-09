@@ -146,7 +146,15 @@
     在能访问 Supabase 的网络里执行：`SUPABASE_URL=... SUPABASE_SERVICE_KEY=... node tools/system-audit.mjs report.md`；
     或临时给仓库加 `SUPABASE_SERVICE_KEY` Secret 后运行 Actions「System Audit」（无密钥会自动跳过）。
    新增行为必须补测试（参考 test-holiday-dates.mjs / test-fixed-behaviors.mjs 的风格）。
-11. **放假功能（2026-09-24 新增）**：
+11. **补排人员的优先级（2026-10-09 加固，勿回退）**：
+   - `getCandidates` 中，**补排人员（makeUpMembers）必须豁免**：连续性约束、`主席团 needZhuXi` 限制、
+     以及 `maxPerRoleThisWeek` 角色配额（每周总人次 `maxPerWeek` 仍然生效）
+   - 原因：真实系统 部员+部长 ≥ 5 → 主席团配额 = 0；若补排只豁免连续性，主席团成员请假后
+     下周补排会被静默丢弃（2026-10-09 由模糊测试发现并修复）
+   - 需求文档 §5.4 的优先级顺序：**补排 > 角色配额 > 公平 > 连续性**
+   - `required=0` 的时段正常绝不排人；唯一例外是需求 §5.5 的**每日最低保障回退**
+     （当天所有 required 时段都被课表挡住 → 回退到空闲时段保证当天有人）
+12. **放假功能（2026-09-24 新增）**：
    - 数据仍存 `day_config`（`is_workday=false` 即放假），**无需新表**；所有电脑共享
    - **语义（重要）**：显式配置了工作日列表就以其为准——整周全放假 = `workdays=[]` = 该周不排班；
      只有「完全没有 dayConfig」时才回退默认周一~周五。修改算法时不要恢复旧的空数组回退逻辑
@@ -157,7 +165,7 @@
    - **绿色预览行（2026-10-05 新增）**：选完日期即显示「将设置 X 天放假：第N周 …」供写入前核对；
      因为推算依赖 `current_week`，管理员忘记每周 +1 会让周次整体偏移一周——预览行是防错关键
    - ⚠️ **每周一需把「学期设置」的当前周 +1**（唯一需要人工做的周期操作）
-12. **成员在岗状态语义（2026-10-05 新增，改代码时必须保持一致）**：
+13. **成员在岗状态语义（2026-10-05 新增，改代码时必须保持一致）**：
    - 排班/课表/统计**查询**用 `.eq('active', true)` **排除已停用**成员（Dashboard/Scheduling/CourseSchedule/Stats 的成员查询）
    - **统计口径例外**：`Stats.jsx` 必须取**全部成员**（含已停用）——停用只是不排班，历史时长不能消失；
      否则「停用成员」会让历史统计凭空减少（已在 2026-10-05 修复）
@@ -165,7 +173,7 @@
      因此 UI 必须先查记录数并强警告，且推荐「停用」；`Members.jsx` 已有 停用/启用 按钮与勾选框
    - 依赖安全：`xlsx` 固定为 **本地 vendor 的官方修复版 0.20.3**（`frontend/vendor/xlsx-0.20.3.tgz`，
      npm 上的 0.18.5 有原型污染/ReDoS 高危漏洞）；升级需保留 vendor 方式，更新后跑 `node test-xlsx.mjs`
-13. **换电脑 / 灾备（2026-09-24 新增）**：
+14. **换电脑 / 灾备（2026-09-24 新增）**：
    - 资产位置：**数据在 Supabase 云端、代码+文档在 GitHub、部署在 Netlify/Pages**，均与个人电脑无关；
      唯一需在本地重建的是 `frontend/.env`（被 gitignore，值从 Supabase → Project Settings → API 取）
    - 工具：`tools/backup-data.mjs`（导出全部业务表 JSON）、`tools/restore-data.mjs`（带 --confirm 才写入）、

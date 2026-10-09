@@ -187,8 +187,11 @@ CREATE TABLE day_config (
 - **mode 参数**（2026-08-14 起支持）：
   - `'一般'（默认）`：排除上周正常值班的人（连续性约束），避免同一人连续两周值班
   - `'紧急'`：跳过连续性约束，允许连排；生成的排班 `is_emergency=true`（在学期设置页切换）
-- **补排优先级**（2026-08-14 修复）：`makeUpMembers`（上周请假、`leave_next_week=true`）优先级最高，
-  覆盖连续性约束——上周请假的人即使出现在 `lastWeek` 中也会被优先补排。
+- **补排优先级**（2026-08-14 修复，2026-10-09 加固）：`makeUpMembers`（上周请假、`leave_next_week=true`）
+  优先级最高，**豁免三类限制**：① 连续性约束（上周请假的即使出现在 `lastWeek` 也会被补排）；
+  ② `主席团 needZhuXi` 限制；③ `maxPerRoleThisWeek` 角色配额（每周总人次 `maxPerWeek` 仍生效）。
+  ③ 的必要性：真实系统 部员+部长 ≥ 5 → 主席团配额 = 0，若补排只豁免 ①②，
+  主席团成员请假后的补排会被静默丢弃（2026-10-09 由模糊测试发现并修复）。
   调用方（Dashboard/Scheduling）已同步修正查询：`lastWeek` 只取 `status='正常'`，
   `makeUpMembers` 只取 `week_number = 当前周-1` 的请假记录。
 - **时段人数语义**（2026-08-14 调整）：`required_count=0` 表示该时段不需要值班，
@@ -284,6 +287,14 @@ const { data, error } = await supabase
 | 3 | 功能 | 日期→(周次,星期) 换算纯函数库（含边界与非法输入处理） | lib/holiday-dates.js |
 | 4 | 功能 | 首页新功能提示横幅（可关闭）+ 排班管理页新功能提示 | Dashboard.jsx / Scheduling.jsx |
 | 5 | 测试 | 新增 test-holiday-dates.mjs（26 项）；等价类 EC-2.5 更新（+3 项）；全量 282/282 | test-holiday-dates.mjs / test-equivalence-classes.mjs |
+
+### 2026-10-09 — 模糊测试发现并修复「补排被角色配额挡掉」（详见 dev-logs/2026-10-09.md）
+
+| # | 类型 | 改动 | 涉及文件 |
+|---|------|------|---------|
+| 1 | 修复 | 补排人员豁免 连续性/主席团限制/角色配额 —— 否则主席团成员请假后补排静默失效 | scheduling-algorithm.js |
+| 2 | 测试 | 新增随机模糊测试（可复现种子，10 条不变量，默认 400 场景，已入 CI） | test-fuzz-invariants.mjs |
+| 3 | 测试 | 新增 3 项回归测试（补排 vs 配额） | test-fixed-behaviors.mjs |
 
 ### 2026-09-24 — Supabase Data API 授权政策应对（详见 dev-logs/2026-09-24.md）
 
