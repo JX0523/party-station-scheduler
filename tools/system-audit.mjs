@@ -77,6 +77,21 @@ async function main() {
     if (hasDuty) holidayConflicts.push(`${d.week_number}|${d.day_of_week}`)
   }
   log(`- 放假标记与已生成排班矛盾(放假却有排班): ${holidayConflicts.length === 0 ? '0 ✅' : holidayConflicts.length + ' ⚠️ ' + holidayConflicts.join('; ')}`)
+  // 更多逻辑一致性检查（2026-10-21 第二轮：覆盖其他类别的潜在矛盾）
+  const orphanSched = schedules.filter(s => !memById.has(s.member_id))
+  log(`- 课表引用不存在成员(孤儿课表): ${orphanSched.length === 0 ? '0 ✅' : orphanSched.length + ' ❌'}`)
+  const dupSched = new Map()
+  for (const s of schedules) { const k = s.member_id + '|' + s.week_type; dupSched.set(k, (dupSched.get(k) || 0) + 1) }
+  const dupSchedList = [...dupSched.entries()].filter(([, c]) => c > 1)
+  log(`- 同一人同周类型重复课表: ${dupSchedList.length === 0 ? '0 ✅' : dupSchedList.length + ' ❌'}`)
+  const totalW = sem.total_weeks || 20
+  const badWeekA = assignments.filter(a => !(a.week_number >= 1 && a.week_number <= totalW))
+  const badWeekD = daycfg.filter(d => !(d.week_number >= 1 && d.week_number <= totalW))
+  log(`- 周次越界(排班/放假标记超出 1~${totalW} 周): ${badWeekA.length + badWeekD.length === 0 ? '0 ✅' : (badWeekA.length + badWeekD.length) + ' ❌'}`)
+  const semRows = await get('semester_config?select=id')
+  log(`- 学期配置行数(必须恰好1行): ${semRows.length === 1 ? '1 ✅' : semRows.length + ' ❌（多学期并存会导致当前周歧义）'}`)
+  const slotRows = slotcfg.length
+  log(`- 时段配置行数(应为 7天×3时段=21 以内): ${slotRows <= 21 && slotRows > 0 ? slotRows + ' ✅' : slotRows + ' ⚠️'}`)
   log('')
 
   // ---------- 2. 每周统计 ----------
