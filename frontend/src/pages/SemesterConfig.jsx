@@ -92,7 +92,7 @@ export default function SemesterConfig() {
             value={form.current_week}
             onChange={e => { const v = parseInt(e.target.value) || 1; const maxW = form.total_weeks || 30; setForm({ ...form, current_week: Math.min(Math.max(v, 1), maxW) }) }} />
           <p style={{ fontSize: 12, color: '#999', marginTop: 4 }}>
-            当前周及之前的排班将被锁定，不可重新生成。每周结束后请更新当前周。
+            当前周及之前的排班将被锁定，不可重新生成。当前周已由系统每周一自动更新，无需手动操作。
           </p>
         </div>
         <div className="form-group">

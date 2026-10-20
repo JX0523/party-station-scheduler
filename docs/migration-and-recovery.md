@@ -153,6 +153,7 @@ node tools/backup-data.mjs D:\我的私有备份
 | 系统体检 | 加临时 Secret `SUPABASE_SERVICE_KEY` → Actions 运行 **System Audit** → 看 `audit-report.md` |
 | 保活是否正常 | Actions 里看 **Keep Supabase Alive** 最近运行是否为绿色（每天一次） |
 | 数据备份 | 见第 4.1 节 |
+| 当前周维护 | **全自动**：私有仓库 Week Auto Advance 每周一北京时间 00:10 自动 +1（锚点=第1周周一 2026-08-31，幂等、上限总周数、写报告） |
 
 ---
 
