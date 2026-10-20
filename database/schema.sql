@@ -148,7 +148,9 @@ ALTER TABLE day_config ADD COLUMN IF NOT EXISTS substitute_for INTEGER DEFAULT N
 
 -- =============================================
 -- RLS: day_config
+-- 2026-10-21 补：此前只建了策略却忘了 ENABLE RLS，导致策略不生效
 -- =============================================
+ALTER TABLE day_config ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "允许认证用户读取工作日配置" ON day_config FOR SELECT TO authenticated USING (true);
 CREATE POLICY "允许认证用户插入工作日配置" ON day_config FOR INSERT TO authenticated WITH CHECK (true);
 CREATE POLICY "允许认证用户更新工作日配置" ON day_config FOR UPDATE TO authenticated USING (true);

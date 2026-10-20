@@ -159,7 +159,13 @@ CREATE TABLE day_config (
 
 `substitute_for` 用于调休课表映射：周六补周一的课 → `substitute_for = 1`，算法会用 `mon_*` 而非 `sat_*` 检查课表冲突。
 
-### 3.8 Data API 授权（GRANT）— 2026-09-24 新增
+### 3.8 Data API 授权（GRANT）— 2026-09-24 新增，2026-10-21 加固
+
+> 2026-10-21 更新：收到 Supabase 官方邮件确认——**现有表不受 10-30 政策影响**，
+> 仅「10-30 之后新建的表」需要显式 GRANT。仓库侧已完备，并新增 **`test-schema-grants.mjs`**（42 项）
+> 纳入 CI：每张表必须有 authenticated/service_role 授权、业务表不得授权 anon、
+> 每张表必须启用 RLS 且至少一条策略、**建表迁移必须自带 GRANT**。
+> 同时修复：`day_config` 此前只建策略未 `ENABLE ROW LEVEL SECURITY`（策略不生效）。
 
 **Supabase 政策变更**：自 **2026-10-30** 起，`public` schema 中**新建的表**不再自动获得 Data API 访问权限。
 

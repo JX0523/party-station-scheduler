@@ -3,7 +3,7 @@
 [![CI](https://github.com/JX0523/party-station-scheduler/actions/workflows/ci.yml/badge.svg)](https://github.com/JX0523/party-station-scheduler/actions/workflows/ci.yml)
 [![Deploy](https://github.com/JX0523/party-station-scheduler/actions/workflows/deploy.yml/badge.svg)](https://github.com/JX0523/party-station-scheduler/actions/workflows/deploy.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-![Tests](https://img.shields.io/badge/tests-743%20passed-brightgreen)
+![Tests](https://img.shields.io/badge/tests-785%20passed-brightgreen)
 
 为大学党员工作站设计的 **Web 排班管理系统**：管理员在浏览器上完成成员管理、课表录入、自动排班、请假替补、**按日期放假**、值班统计等全流程工作，替代手工排班。
 
@@ -41,7 +41,7 @@
 | 数据 | Supabase：PostgreSQL 15、Auth（邮箱密码）、RLS 行级安全 |
 | 导出 | SheetJS (xlsx) |
 | 部署 | GitHub Pages + Netlify，GitHub Actions 自动构建 |
-| 测试 | 单元 + 模糊 + 运行时冒烟（**743 项检查**：含 400 个随机场景不变量校验、16 项页面真实渲染） |
+| 测试 | 单元 + 模糊 + 冒烟 + 授权合规（**785 项检查**：含 400 随机场景、16 项页面真实渲染、42 项 DB 授权检查） |
 
 ## 项目结构
 
@@ -126,8 +126,9 @@ GitHub Actions 部署时通过仓库 Secrets 注入：`VITE_SUPABASE_URL`、`VIT
 | test-full-semester.mjs | 14 | 整学期模拟 |
 | test-phase1-fix.mjs | 34 | 课表冲突与调休 |
 | test-fuzz-invariants.mjs | 400 | **随机模糊测试**：400 个随机场景 × 10 条不变量（可复现种子） |
+| test-schema-grants.mjs | 42 | **数据库授权合规**：每表 GRANT/RLS/策略、建表迁移必须带 GRANT |
 | test-runtime-smoke.mjs | 16 | **运行时冒烟**：加载构建产物，逐页真实渲染（7 个页面）+ 未登录场景 |
-| **合计** | **743** | 全部通过（CI 每次提交都会跑） |
+| **合计** | **785** | 全部通过（CI 每次提交都会跑） |
 
 ## 已知注意点
 

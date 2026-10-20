@@ -43,6 +43,10 @@ GRANT SELECT, INSERT, DELETE ON public.keep_alive_pings TO anon;
 GRANT SELECT, INSERT, DELETE ON public.keep_alive_pings TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.keep_alive_pings TO service_role;
 
+-- ---------- 2.5 RLS 兜底：day_config 此前缺 ENABLE RLS（2026-10-21 补） ----------
+-- 说明：开 RLS 后其既有策略（允许认证用户读写）立即生效，功能不受影响。
+ALTER TABLE public.day_config ENABLE ROW LEVEL SECURITY;
+
 -- ---------- 3. 自增/序列权限（新表若用 identity/serial，必要时一并授予） ----------
 -- 本项目的 keep_alive_pings.id 使用 GENERATED ALWAYS AS IDENTITY，身份列随表授权，
 -- 无需单独 GRANT；若将来改用 serial 或显式 sequence，请按下面模板补授：

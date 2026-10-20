@@ -12,6 +12,12 @@ CREATE TABLE IF NOT EXISTS day_config (
   UNIQUE(week_number, day_of_week)
 );
 
+-- 1.5  RLS 开关 + 显式授权（2026-10-21 补：Supabase 2026-10-30 起新表需显式 GRANT）
+ALTER TABLE day_config ENABLE ROW LEVEL SECURITY;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.day_config TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.day_config TO service_role;
+
 -- 2. RLS 策略
 DROP POLICY IF EXISTS "允许认证用户读取工作日配置" ON day_config;
 DROP POLICY IF EXISTS "允许认证用户插入工作日配置" ON day_config;

@@ -138,10 +138,13 @@
    ```
    现有 8 张表已显式授权（见 schema.sql 第 9 节与 migration-v6），不受影响。
    完整模板见 `database/migration-v6-data-api-grants.sql` 末尾注释。
+   **已由 `test-schema-grants.mjs`（42 项）在 CI 中强制检查**：谁漏了 GRANT，CI 直接红灯。
+   同时要求：每张表必须 `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` **且**至少一条策略
+   （只建策略不开 RLS = 策略不生效；2026-10-21 发现 `day_config` 正是这个坑，已修）。
 9. **环境变量**：`VITE_SUPABASE_URL`、`VITE_SUPABASE_ANON_KEY` 必填；
    `VITE_ALLOW_REGISTRATION=true` 才显示登录页注册入口（默认关闭）；
    `VITE_BASE` 用于 GitHub Pages 子路径部署。CI secrets 与 `frontend/.env` 保持一致。
-10. **测试全部通过**：`Get-ChildItem test-*.mjs | ForEach-Object { node $_ }`（311项，9个套件）。
+10. **测试全部通过**：`Get-ChildItem test-*.mjs | ForEach-Object { node $_ }`（785 项，13 个套件）。
     **系统审计**：`tools/system-audit.mjs`（真实数据完整性 + 真实算法模拟，输出 Markdown 报告）；
     在能访问 Supabase 的网络里执行：`SUPABASE_URL=... SUPABASE_SERVICE_KEY=... node tools/system-audit.mjs report.md`；
     或临时给仓库加 `SUPABASE_SERVICE_KEY` Secret 后运行 Actions「System Audit」（无密钥会自动跳过）。

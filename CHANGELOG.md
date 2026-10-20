@@ -7,6 +7,39 @@
 
 ---
 
+## [2026-10-21] — 应对 Supabase 10-30 新表授权政策（收到官方邮件后核查）
+
+### 背景
+Supabase 官方邮件：**2026-10-30 起**，public schema 中【新建的表】不再自动获得 Data API 权限，
+必须在建表时显式 `GRANT`，否则 supabase-js / PostgREST 返回 `permission denied`（42501）。
+**现有表不受影响**（保留当前授权）——因此本系统无需紧急操作。
+
+### 核查结论（仓库原本已具备）
+- `database/schema.sql` 第 9 节已为 8 张表写好显式 GRANT；`migration-v6` 已提供幂等补齐脚本；
+  `CLAUDE.md` 第 8 条已强制「新表必须带 GRANT」
+
+### 本轮修复（自动化检查发现的 3 个缺口）
+1. **`day_config` 忘记 `ENABLE ROW LEVEL SECURITY`** —— 只建了 3 条策略却未开 RLS，策略形同虚设；
+   已补（schema.sql / migration-dayoff.sql / migration-v6 兜底）
+2. `migration-dayoff.sql` 建 `day_config` 时未带 GRANT → 已补
+3. `migration-v5-keepalive.sql` 建 `keep_alive_pings` 时未带 GRANT → 已补
+
+### 新增：授权合规自动化检查
+- **`test-schema-grants.mjs`**（42 项）：静态解析 `database/*.sql`，强制校验——
+  每张表都 GRANT 给 authenticated + service_role；业务表不得授权 anon；保活表必须授权 anon；
+  每张表都启用 RLS 且至少一条策略；**任何建表迁移必须自带 GRANT**（政策核心）
+- 已纳入 CI：以后谁加表忘了授权，CI 直接红灯
+
+### 验证
+- 全量 **785 项检查 / 0 失败**（新增 42 项授权检查）；构建成功；lint 0 error
+
+### 需要你做的（可选，1 分钟）
+- 线上库若想让授权「显式化」并顺手补上 day_config 的 RLS：
+  Supabase → SQL Editor → 粘贴执行 `database/migration-v6-data-api-grants.sql`（幂等，可重复跑）
+- 不执行也不影响现有功能（Supabase 明确现有表保留授权）
+
+---
+
 ## [2026-10-09] — 模糊测试抓出并修复真实缺陷：补排被角色配额挡掉
 
 ### 修复（真实缺陷）

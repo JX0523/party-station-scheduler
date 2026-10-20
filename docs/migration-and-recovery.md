@@ -148,7 +148,8 @@ node tools/backup-data.mjs D:\我的私有备份
 |----------|--------|
 | 改代码并上线 | 改完 `git add -A && git commit -m "说明" && git push origin master` → 自动构建部署（详见 docs/git-workflow.md） |
 | 只改文档 | 同样推送即可；纯文档提交**不会触发部署**（省 Netlify 积分） |
-| 数据库结构变更 | 写 `database/migration-vX-*.sql` → Supabase SQL Editor 执行 → 登记到 tech-spec 第 7 节（**新表必须带 GRANT**） |
+| 数据库结构变更 | 写 `database/migration-vX-*.sql` → Supabase SQL Editor 执行 → 登记到 tech-spec 第 7 节（**新表必须带 GRANT + ENABLE RLS**，CI 会检查） |
+| 一次性加固（可选） | SQL Editor 执行 `database/migration-v6-data-api-grants.sql`（幂等）：显式化授权 + 补 day_config 的 RLS |
 | 系统体检 | 加临时 Secret `SUPABASE_SERVICE_KEY` → Actions 运行 **System Audit** → 看 `audit-report.md` |
 | 保活是否正常 | Actions 里看 **Keep Supabase Alive** 最近运行是否为绿色（每天一次） |
 | 数据备份 | 见第 4.1 节 |

@@ -15,6 +15,11 @@ CREATE TABLE IF NOT EXISTS keep_alive_pings (
 
 ALTER TABLE keep_alive_pings ENABLE ROW LEVEL SECURITY;
 
+-- 显式授权（2026-10-21 补：Supabase 2026-10-30 起新表需显式 GRANT）
+GRANT SELECT, INSERT, DELETE ON public.keep_alive_pings TO anon;
+GRANT SELECT, INSERT, DELETE ON public.keep_alive_pings TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.keep_alive_pings TO service_role;
+
 -- 该表不含任何敏感数据，允许 anon 角色插入/删除
 -- （keep-alive workflow 使用 VITE_SUPABASE_ANON_KEY 调用）
 CREATE POLICY "允许匿名插入心跳" ON keep_alive_pings FOR INSERT TO anon WITH CHECK (true);
