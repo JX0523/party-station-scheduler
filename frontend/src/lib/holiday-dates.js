@@ -126,25 +126,28 @@ export function weekdayCN(day) {
 
 /**
  * 展开日期区间 → 逐日 {date, week, day}
- * @returns {{days:Array, error?:string, outOfRange?:Array}}
+ * @param {number} minWeek 允许设置的最低周次（默认 0）：week < minWeek 的日期进 pastWeeks，
+ *        用于阻止给「已过去/已锁定的历史周」设置放假
+ * @returns {{days:Array, error:string, outOfRange:Array, pastWeeks:Array}}
  */
-export function expandDateRange(startStr, endStr, semesterStartStr, totalWeeks) {
+export function expandDateRange(startStr, endStr, semesterStartStr, totalWeeks, minWeek = 0) {
   const a = toUTC(startStr); const b = toUTC(endStr)
   if (a === null || b === null) return { days: [], error: '日期格式不正确，请使用 YYYY-MM-DD' }
   if (b < a) return { days: [], error: '结束日期不能早于开始日期' }
   const span = Math.round((b - a) / DAY_MS) + 1
   if (span > 120) return { days: [], error: '日期跨度太大（最多 120 天），请分段设置' }
-  const days = []; const outOfRange = []
+  const days = []; const outOfRange = []; const pastWeeks = []
   for (let i = 0; i < span; i++) {
     const d = new Date(a + i * DAY_MS)
     const ymd = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
     const wd = dateToWeekDay(ymd, semesterStartStr)
     if (!wd) return { days: [], error: '第1周周一日期不正确' }
     const item = { date: ymd, week: wd.week, day: wd.day }
-    if (totalWeeks && (wd.week < 1 || wd.week > totalWeeks)) outOfRange.push(item)
+    if (minWeek > 0 && wd.week < minWeek) pastWeeks.push(item)
+    else if (totalWeeks && (wd.week < 1 || wd.week > totalWeeks)) outOfRange.push(item)
     else days.push(item)
   }
-  return { days, outOfRange }
+  return { days, outOfRange, pastWeeks }
 }
 
 /**

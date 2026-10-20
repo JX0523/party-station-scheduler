@@ -175,6 +175,24 @@ test('describeWeeks 输出第1周与当前周范围', () => {
   eq(d.current, { from: '2026-09-21', to: '2026-09-27' })
 })
 
+console.log('\n📋 6.6 历史周护栏（minWeek）')
+test('minWeek=5 时，早于第5周的日期进 pastWeeks 且不写入 days', () => {
+  const r = expandDateRange('2026-09-01', '2026-10-10', START, 18, 5)
+  ok(r.pastWeeks.length > 0, '应有被挡掉的历史周日期')
+  ok(r.days.every(d => d.week >= 5), '留下的日期都应 >= 第5周')
+  eq(r.pastWeeks[0].week, 1, '第一个被挡的应是第1周')
+})
+test('minWeek 默认 0 = 不挡任何历史周（向后兼容）', () => {
+  const r = expandDateRange('2026-09-01', '2026-09-07', START, 18)
+  eq(r.pastWeeks.length, 0)
+  eq(r.days.length, 7)
+})
+test('区间全部落在历史周 → days 为空且 pastWeeks 有值', () => {
+  const r = expandDateRange('2026-09-14', '2026-09-18', START, 18, 8)
+  eq(r.days.length, 0)
+  eq(r.pastWeeks.length, 5)
+})
+
 console.log('\n📋 7. 排班算法联动（整周放假不排班）')
 function makeMembers(n) {
   const m = []; for (let i = 1; i <= n; i++) m.push({ id: 'm' + i, name: '成员' + i, role: '部员' })

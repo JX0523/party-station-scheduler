@@ -67,7 +67,7 @@ export default function HolidayPanel({ config, onChanged }) {
   async function applyHoliday() {
     if (!startDate) return flash('error', '无法推算周次，请在下方「手动修正」里填写第1周周一')
     if (override && !isMonday(override)) return flash('error', '手动指定的「第1周周一」必须是周一，请检查')
-    const r = expandDateRange(from, to, startDate, totalWeeks)
+    const r = expandDateRange(from, to, startDate, totalWeeks, currentWeek) // minWeek=currentWeek：历史周禁止设置放假
     if (r.error) return flash('error', r.error)
     if (r.days.length === 0) return flash('error', '所选区间没有落在学期周次内（请检查日期或「当前周」设置）')
 
@@ -92,7 +92,10 @@ export default function HolidayPanel({ config, onChanged }) {
       await loadRows()
       if (onChanged) onChanged()
       const weeks = [...new Set(set.map(x => x.week))].join('、')
-      const extra = r.outOfRange && r.outOfRange.length ? `（另有 ${r.outOfRange.length} 天超出学期周数，已忽略）` : ''
+      const notes = []
+      if (r.outOfRange && r.outOfRange.length) notes.push('另有 ' + r.outOfRange.length + ' 天超出学期周数，已忽略')
+      if (r.pastWeeks && r.pastWeeks.length) notes.push(r.pastWeeks.length + ' 天属于已过去的周（已锁定），不能设置放假')
+      const extra = notes.length ? '（' + notes.join('；') + '）' : ''
       flash('success', `已设置放假 ${done} 天，涉及第 ${weeks} 周${extra}。请到「排班管理」重新生成相关周，或点「清理放假日的排班」。`)
     } finally { setBusy(false) }
   }
@@ -125,7 +128,7 @@ export default function HolidayPanel({ config, onChanged }) {
   }
 
   // 实时预览：点「设为放假」之前就能核对周次（防止「当前周」没更新造成偏移）
-  const preview = (startDate && from && to) ? expandDateRange(from, to, startDate, totalWeeks) : null
+  const preview = (startDate && from && to) ? expandDateRange(from, to, startDate, totalWeeks, currentWeek) : null
   const previewText = preview && !preview.error ? describeHolidayPlan(preview.days) : ''
 
   const grouped = groupHolidayRows(rows, startDate || null)
@@ -194,6 +197,7 @@ export default function HolidayPanel({ config, onChanged }) {
             <span>
               🔍 <strong>将设置 {preview.days.length} 天放假</strong>：{previewText || '（无）'}
               {preview.outOfRange && preview.outOfRange.length > 0 ? '（另有 ' + preview.outOfRange.length + ' 天超出学期周数，会被忽略）' : ''}
+              {preview.pastWeeks && preview.pastWeeks.length > 0 ? '（' + preview.pastWeeks.length + ' 天属于已过去的周，不能设置放假）' : ''}
               <div style={{ marginTop: 4, color: '#7cb342', fontSize: 12 }}>
                 请核对上面的周次是否符合实际；若不对，说明「当前第 {currentWeek} 周」该更新了
                 （去「学期设置」修改，或点上方「推算不准？修正」）。

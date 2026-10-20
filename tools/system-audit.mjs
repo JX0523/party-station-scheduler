@@ -69,6 +69,14 @@ async function main() {
   for (const a of assignments) { const k = `${a.week_number}|${a.day_of_week}|${a.slot}`; if (!slots.has(k)) slots.set(k, []); slots.get(k).push(a) }
   const uncovered = [...slots.entries()].filter(([, rows]) => rows.some(r => r.status === '请假') && !rows.some(r => r.status === '正常'))
   log(`- 请假但无替补(该时段无人值班): ${uncovered.length === 0 ? '0 ✅' : uncovered.length + ' ⚠️ ' + uncovered.map(([k]) => k).join('; ')}`)
+  // 放假标记 vs 实际排班一致性（2026-10-21 新增：防止「明明值了班却被标成放假」的逻辑矛盾）
+  const holidayConflicts = []
+  for (const d of daycfg) {
+    if (d.is_workday !== false) continue
+    const hasDuty = assignments.some(a => a.week_number === d.week_number && a.day_of_week === d.day_of_week && a.status === '正常')
+    if (hasDuty) holidayConflicts.push(`${d.week_number}|${d.day_of_week}`)
+  }
+  log(`- 放假标记与已生成排班矛盾(放假却有排班): ${holidayConflicts.length === 0 ? '0 ✅' : holidayConflicts.length + ' ⚠️ ' + holidayConflicts.join('; ')}`)
   log('')
 
   // ---------- 2. 每周统计 ----------
