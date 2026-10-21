@@ -1,18 +1,23 @@
-=== 1. 站点信息 ===
-{"name":"creative-brioche-5681d2","account_slug":"jx0523","account_name":"JX0523"}
+=== Netlify 部署用量监控 ===
+时间(UTC): 2026-10-21T03:02:13Z
 
-=== 2. 团队账户列表 ===
-{"slug":"jx0523","id":"6a657efe40010ed320addb34","name":"JX0523","type":null}
-JX0523 账户 id = 6a657efe40010ed320addb34
+本周期起点: 2026-09-26 ｜ 今天: 2026-10-21
 
-=== 3. 用量端点尝试 ===
---- GET /api/v1/accounts/6a657efe40010ed320addb34/usage ---
-Not Found
---- GET /api/v1/accounts/6a657efe40010ed320addb34/usage?from=2026-09-26 ---
-Not Found
---- GET /api/v1/accounts/6a657efe40010ed320addb34/billing ---
-Not Found
---- GET /api/v1/accounts/6a657efe40010ed320addb34/billing/credits ---
-Not Found
---- GET /api/v1/accounts/6a657efe40010ed320addb34/credits ---
-Not Found
+历史部署总数(最近100): 47
+本周期内部署次数: 11
+
+--- 本周期部署明细 ---
+2026-10-20T17:08:52.722Z	ready	production
+2026-10-20T16:44:39.691Z	ready	production
+2026-10-09T00:45:20.868Z	ready	production
+2026-10-08T11:11:08.367Z	ready	production
+2026-10-08T11:06:14.823Z	ready	production
+2026-10-08T10:49:43.370Z	ready	production
+2026-10-05T02:45:48.421Z	ready	production
+2026-10-05T01:20:27.671Z	ready	production
+2026-10-04T07:55:19.623Z	ready	production
+2026-10-04T07:35:27.197Z	ready	production
+2026-10-04T07:29:57.419Z	ready	production
+
+估算积分消耗: ~66 / 300
+估算使用比例: ~22%
