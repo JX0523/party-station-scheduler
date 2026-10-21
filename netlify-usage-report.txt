@@ -1,0 +1,18 @@
+=== 1. 站点信息 ===
+{"name":"creative-brioche-5681d2","account_slug":"jx0523","account_name":"JX0523"}
+
+=== 2. 团队账户列表 ===
+{"slug":"jx0523","id":"6a657efe40010ed320addb34","name":"JX0523","type":null}
+JX0523 账户 id = 6a657efe40010ed320addb34
+
+=== 3. 用量端点尝试 ===
+--- GET /api/v1/accounts/6a657efe40010ed320addb34/usage ---
+Not Found
+--- GET /api/v1/accounts/6a657efe40010ed320addb34/usage?from=2026-09-26 ---
+Not Found
+--- GET /api/v1/accounts/6a657efe40010ed320addb34/billing ---
+Not Found
+--- GET /api/v1/accounts/6a657efe40010ed320addb34/billing/credits ---
+Not Found
+--- GET /api/v1/accounts/6a657efe40010ed320addb34/credits ---
+Not Found
