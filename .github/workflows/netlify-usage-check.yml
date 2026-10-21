@@ -39,14 +39,14 @@ jobs:
             echo '--- 本周期部署明细 ---'
             awk -v s="$START" 'substr($1,1,10) >= s' /tmp/all.txt | tail -40
             echo ''
-            # 按经验系数估算：每 1 次部署约 6 积分（用 2026-10-21 的邮件数据校准：
-            # 周期内 ~25 次部署 = 150 积分 = 50%）
-            EST=$((IN_CYCLE * 6))
-            echo "估算积分消耗: ~$EST / 300"
+            # 校准（2026-10-21 实测）：邮件称 50%=150 积分，本周期部署 11 次
+            # → 系数 ≈ 14 积分/次部署（含带宽摊销）
+            EST=$((IN_CYCLE * 14))
+            echo "估算积分消耗: ~$EST / 300（校准系数 14 积分/次部署，含带宽摊销）"
             PCT=$((EST * 100 / 300))
             echo "估算使用比例: ~$PCT%"
-            if [ $EST -ge 210 ]; then echo '⚠️ 接近 70%+，建议减少非必要部署'; fi
-            if [ $EST -ge 270 ]; then echo '🚨 接近 90%！暂停 Netlify 部署，GitHub Pages 仍可继续更新'; fi
+            if [ $EST -ge 210 ]; then echo '⚠️ 估计已用 70%+：建议减少非必要部署（改代码攒一攒再推）'; fi
+            if [ $EST -ge 270 ]; then echo '🚨 估计已用 90%+：立即暂停 Netlify 部署！GitHub Pages 仍可继续更新，25 日自动重置'; fi
           } > netlify-usage-report.txt 2>&1
           cat netlify-usage-report.txt
       - name: Commit report
