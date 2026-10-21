@@ -1,37 +1,52 @@
-# 一次性：查询 Netlify 账户积分用量（只读，不消耗积分）
-name: Netlify Usage Check (one-shot)
+# 部署用量监控：统计本计费周期的部署次数并估算积分消耗（只读，可手动触发）
+name: Netlify Deploy Watch
 on:
+  schedule:
+    - cron: '30 17 * * 1'   # 每周一 01:30 北京时间
   workflow_dispatch:
 jobs:
-  check:
+  watch:
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - name: Query usage
+      - name: Count deploys in current billing cycle
         env:
           NETLIFY_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE: ${{ secrets.NETLIFY_SITE_ID }}
         run: |
           {
-            echo '=== 1. 站点信息 ==='
-            SITE=$(curl -sf -H "Authorization: Bearer ${NETLIFY_TOKEN}" "https://api.netlify.com/api/v1/sites/${NETLIFY_SITE}")
-            echo "$SITE" | jq -c '{name, account_slug, account_name}'
-            SLUG=$(echo "$SITE" | jq -r .account_slug)
+            echo '=== Netlify 部署用量监控 ==='
+            echo '时间(UTC): '$(date -u +%FT%TZ)
             echo ''
-            echo '=== 2. 团队账户列表 ==='
-            ACCTS=$(curl -sf -H "Authorization: Bearer ${NETLIFY_TOKEN}" "https://api.netlify.com/api/v1/accounts")
-            echo "$ACCTS" | jq -c '.[] | {slug, id, name, type}'
-            AID=$(echo "$ACCTS" | jq -r ".[] | select(.slug==\"$SLUG\") | .id")
-            echo "JX0523 账户 id = $AID"
+            # 本计费周期 = 当月26日 到 次月25日
+            TODAY=$(date -u +%Y-%m-%d)
+            DAY=$(date -u +%-d)
+            Y=$(date -u +%Y); M=$(date -u +%-m)
+            if [ $DAY -le 25 ]; then START_M=$((M-1)); START_Y=$Y; else START_M=$M; START_Y=$Y; fi
+            if [ $START_M -le 0 ]; then START_M=12; START_Y=$((Y-1)); fi
+            START=$(printf '%04d-%02d-26' $START_Y $START_M)
+            echo "本周期起点: $START ｜ 今天: $TODAY"
             echo ''
-            echo '=== 3. 用量端点尝试 ==='
-            for ep in 'usage' 'usage?from=2026-09-26' 'billing' 'billing/credits' 'credits'; do
-              echo "--- GET /api/v1/accounts/$AID/$ep ---"
-              curl -s --max-time 20 -H "Authorization: Bearer ${NETLIFY_TOKEN}" "https://api.netlify.com/api/v1/accounts/$AID/$ep" | head -c 1000 || true
-              echo ''
-            done
+            DEPLOYS=$(curl -sf -H "Authorization: Bearer ${NETLIFY_TOKEN}" "https://api.netlify.com/api/v1/sites/${NETLIFY_SITE}/deploys?per_page=100")
+            echo "$DEPLOYS" | jq -r '.[] | [.created_at, .state, (.context // "manual")] | @tsv' > /tmp/all.txt
+            TOTAL=$(wc -l < /tmp/all.txt)
+            IN_CYCLE=$(awk -v s="$START" 'substr($1,1,10) >= s {n++} END {print n+0}' /tmp/all.txt)
+            echo "历史部署总数(最近100): $TOTAL"
+            echo "本周期内部署次数: $IN_CYCLE"
+            echo ''
+            echo '--- 本周期部署明细 ---'
+            awk -v s="$START" 'substr($1,1,10) >= s' /tmp/all.txt | tail -40
+            echo ''
+            # 按经验系数估算：每 1 次部署约 6 积分（用 2026-10-21 的邮件数据校准：
+            # 周期内 ~25 次部署 = 150 积分 = 50%）
+            EST=$((IN_CYCLE * 6))
+            echo "估算积分消耗: ~$EST / 300"
+            PCT=$((EST * 100 / 300))
+            echo "估算使用比例: ~$PCT%"
+            if [ $EST -ge 210 ]; then echo '⚠️ 接近 70%+，建议减少非必要部署'; fi
+            if [ $EST -ge 270 ]; then echo '🚨 接近 90%！暂停 Netlify 部署，GitHub Pages 仍可继续更新'; fi
           } > netlify-usage-report.txt 2>&1
           cat netlify-usage-report.txt
       - name: Commit report
@@ -40,5 +55,5 @@ jobs:
           git config user.name 'usage-bot'
           git config user.email 'usage-bot@users.noreply.github.com'
           git add netlify-usage-report.txt
-          git commit -m "netlify usage check $(date -u +%F)" || echo 'nothing to commit'
+          git commit -m "netlify usage watch $(date -u +%F)" || echo 'nothing to commit'
           git push || echo 'PUSH_FAILED'
