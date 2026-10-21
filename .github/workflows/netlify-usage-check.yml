@@ -1,0 +1,44 @@
+# 一次性：查询 Netlify 账户积分用量（只读，不消耗积分）
+name: Netlify Usage Check (one-shot)
+on:
+  workflow_dispatch:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Query usage
+        env:
+          NETLIFY_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE: ${{ secrets.NETLIFY_SITE_ID }}
+        run: |
+          {
+            echo '=== 1. 站点信息 ==='
+            SITE=$(curl -sf -H "Authorization: Bearer ${NETLIFY_TOKEN}" "https://api.netlify.com/api/v1/sites/${NETLIFY_SITE}")
+            echo "$SITE" | jq -c '{name, account_slug, account_name}'
+            SLUG=$(echo "$SITE" | jq -r .account_slug)
+            echo ''
+            echo '=== 2. 团队账户列表 ==='
+            ACCTS=$(curl -sf -H "Authorization: Bearer ${NETLIFY_TOKEN}" "https://api.netlify.com/api/v1/accounts")
+            echo "$ACCTS" | jq -c '.[] | {slug, id, name, type}'
+            AID=$(echo "$ACCTS" | jq -r ".[] | select(.slug==\"$SLUG\") | .id")
+            echo "JX0523 账户 id = $AID"
+            echo ''
+            echo '=== 3. 用量端点尝试 ==='
+            for ep in 'usage' 'usage?from=2026-09-26' 'billing' 'billing/credits' 'credits'; do
+              echo "--- GET /api/v1/accounts/$AID/$ep ---"
+              curl -s --max-time 20 -H "Authorization: Bearer ${NETLIFY_TOKEN}" "https://api.netlify.com/api/v1/accounts/$AID/$ep" | head -c 1000 || true
+              echo ''
+            done
+          } > netlify-usage-report.txt 2>&1
+          cat netlify-usage-report.txt
+      - name: Commit report
+        if: always()
+        run: |
+          git config user.name 'usage-bot'
+          git config user.email 'usage-bot@users.noreply.github.com'
+          git add netlify-usage-report.txt
+          git commit -m "netlify usage check $(date -u +%F)" || echo 'nothing to commit'
+          git push || echo 'PUSH_FAILED'
