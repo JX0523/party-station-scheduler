@@ -1,6 +1,6 @@
 node_modules/
 dist/
-.env
+.env*
 # ⚠️ 数据备份含成员姓名/电话等个人信息 —— 绝不能提交到公开仓库（2026-10-05 加固）
 backups/
 backup/
