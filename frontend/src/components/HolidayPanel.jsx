@@ -146,6 +146,20 @@ export default function HolidayPanel({ config, onChanged }) {
         设置后到「排班管理」重新生成相关周，或用下方按钮一键清理。
       </p>
 
+      {/* 操作说明（点「怎么用？」展开） */}
+      {showHelp && (
+        <div style={{ fontSize: 12.5, color: '#333', background: '#FAFAFA', border: '1px dashed #BDBDBD',
+          borderRadius: 6, padding: '10px 14px', marginBottom: 12, lineHeight: 1.8 }}>
+          <strong>使用步骤：</strong>
+          <div>① 先核对上方蓝字：第 1 周周一、本周日期是否与实际一致；不一致点「推算不准？修正」手动指定。</div>
+          <div>② 选「放假开始 / 结束」日期，点 <strong>🌴 设为放假</strong>：这些天会被标为非工作日，排班时跳过。</div>
+          <div>③ 整周全放假时，该周不会生成任何排班（不是“每天少排”，而是整周为 0 条）。</div>
+          <div>④ 若这些日期已经排过班，点 <strong>🧹 清理放假日的排班</strong> 删除（只清未锁定的周，会二次确认）。</div>
+          <div>⑤ 撤销放假：在下方列表里对该周点 <strong>取消该周放假</strong>。</div>
+          <div>⑥ 限制：<strong>已过去的周不能设放假</strong>；超出学期总周数的日期会被忽略（预览里会提示）。</div>
+        </div>
+      )}
+
       {/* 自动推算信息（无需用户填写） */}
       {info && (
         <div style={{ fontSize: 12.5, color: '#1565c0', background: '#E3F2FD', border: '1px solid #90CAF9',
