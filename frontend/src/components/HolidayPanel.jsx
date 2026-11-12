@@ -104,10 +104,16 @@ export default function HolidayPanel({ config, onChanged }) {
     if (!confirm(`确定取消第 ${week} 周的放假设置吗？\n\n该周将恢复为默认工作日（周一~周五）。`)) return
     setBusy(true)
     try {
-      await supabase.from('day_config').delete().eq('week_number', week).eq('is_workday', false)
+      const { data, error } = await supabase.from('day_config').delete()
+        .eq('week_number', week).eq('is_workday', false).select('id')
+      if (error) return flash('error', '取消失败：' + error.message)
+      if (!data || data.length === 0) {
+        await loadRows()
+        return flash('error', '取消失败：没有删除任何记录（数据库可能缺少 day_config 的删除策略，请先执行 migration-v7）')
+      }
       await loadRows()
       if (onChanged) onChanged()
-      flash('success', `已取消第 ${week} 周的放假设置`)
+      flash('success', `已取消第 ${week} 周的放假设置（删除 ${data.length} 条）`)
     } finally { setBusy(false) }
   }
 

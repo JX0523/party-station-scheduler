@@ -154,6 +154,8 @@ ALTER TABLE day_config ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "允许认证用户读取工作日配置" ON day_config FOR SELECT TO authenticated USING (true);
 CREATE POLICY "允许认证用户插入工作日配置" ON day_config FOR INSERT TO authenticated WITH CHECK (true);
 CREATE POLICY "允许认证用户更新工作日配置" ON day_config FOR UPDATE TO authenticated USING (true);
+-- 2026-11-12 补：缺 DELETE 策略会导致「取消该周放假」静默失效（删除 0 行、不报错）
+CREATE POLICY "允许认证用户删除工作日配置" ON day_config FOR DELETE TO authenticated USING (true);
 
 -- =============================================
 -- 插入默认时段配置（每时段默认1人，含周六日）
