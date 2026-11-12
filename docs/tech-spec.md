@@ -4,10 +4,10 @@
 
 | 层级 | 技术 | 版本 | 说明 |
 |------|------|------|------|
-| 前端框架 | React | 18.x | SPA单页应用 |
-| 构建工具 | Vite | 5.x | 快速开发构建 |
+| 前端框架 | React | 19.x | SPA单页应用 |
+| 构建工具 | Vite | 8.x | 快速开发构建 |
 | 语言 | JavaScript (JSX) | ES2022 | - |
-| 路由 | React Router | 6.x | 客户端路由 |
+| 路由 | React Router | 7.x | 客户端路由 |
 | 状态管理 | React Context | - | 轻量级全局状态 |
 | UI样式 | CSS Modules | - | 组件级样式隔离 |
 | HTTP客户端 | Supabase JS Client | 2.x | 数据库直连 |
@@ -16,7 +16,10 @@
 | 用户认证 | Supabase Auth | - | Email+密码 |
 | 图表 | 自行实现 | - | 轻量表格展示 |
 | Excel导出 | xlsx | - | SheetJS社区版 |
-| 部署 | Vercel | - | 免费托管 |
+| 部署 | Netlify（主）+ GitHub Pages（备） | - | GitHub Actions 自动构建 |
+
+> 版本说明（2026-11-12 修正）：以上为 `frontend/package.json` 的实际版本，
+> 早期文档写的 React 18 / Vite 5 / React Router 6 已过时。
 
 ## 2. 架构图
 
