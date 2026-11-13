@@ -2,12 +2,13 @@
 name: CI
 on:
   push:
-    paths-ignore:          # 只改文档时不跑（减少无意义运行）
+    branches: [master]      # 只在主线跑（分支/临时实验不打扰）
+    paths-ignore:           # 只改文档时不跑
       - '**/*.md'
       - 'docs/**'
       - 'dev-logs/**'
       - '.gitignore'
-  pull_request:            # 任何 PR 都会跑，作为合并前的质量门禁
+  pull_request:             # 合并前的质量门禁
   workflow_dispatch:
 jobs:
   test:
