@@ -58,7 +58,7 @@
 │   ├── src/pages/  src/components/          # 页面与组件
 │   └── vendor/xlsx-0.20.3.tgz               # 内置修复版依赖（离线可装）
 ├── database/                                # schema.sql + 迁移脚本 + seed-demo.sql（演示数据）
-├── test-*.mjs                               # 23 个测试套件（955 项检查，含界面测试）
+├── test-*.mjs                               # 24 个测试套件（955 项检查，含界面测试）
 ├── tools/                                   # 运维脚本：系统审计 / 数据备份 / 数据恢复
 └── .github/                                 # CI、部署、保活、Issue/PR 模板
 ```
@@ -137,8 +137,9 @@ GitHub Actions 部署时通过仓库 Secrets 注入：`VITE_SUPABASE_URL`、`VIT
 | test-config-ui.mjs | 14 | 学期设置必填校验、时段配置 21 条保存 |
 | test-doc-claims.mjs | 25 | 文档公式一致性：部长/主席团配额、每周上限、放假、紧急模式、调休、确定性 |
 | test-golden-example.mjs | 11 | 白板手算示例金标准（讲义/速查卡的示例输出必须与代码一致） |
+| test-stats-ui.mjs | 10 | 统计导出：时长/请假次数计算、导出不报错、视图切换 |
 | test-console-clean.mjs | 8 | 全站控制台零错误巡检（8 个路由） |
-| **合计** | **955** | 全部通过（CI 每次提交都会跑；界面测试需先构建） |
+| **合计** | **965** | 全部通过（CI 每次提交都会跑；界面测试需先构建） |
 
 ## 已知注意点
 
