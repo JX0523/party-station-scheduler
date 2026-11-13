@@ -94,3 +94,45 @@ BEGIN
   END IF;
   RAISE NOTICE '✅ 数据库验收全部通过；接着按 方案\合并上线清单.md 做页面层验证';
 END $$;
+
+-- ============================================================
+-- ↓↓↓ 重点看这里：Results 表格（即使上面的 NOTICE 看不到，这里也一定显示）↓↓↓
+-- ============================================================
+SELECT '1 表存在'            AS 检查项, (to_regclass('public.share_links') IS NOT NULL)                      AS 通过,
+       coalesce(to_regclass('public.share_links')::text, '不存在')                                          AS 说明
+UNION ALL
+SELECT '2 表启用 RLS',
+       coalesce((SELECT relrowsecurity FROM pg_class WHERE relname='share_links' AND relnamespace='public'::regnamespace), false),
+       'relrowsecurity'
+UNION ALL
+SELECT '3 策略数 ≥ 4',
+       ((SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='share_links') >= 4),
+       '当前 ' || (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='share_links') || ' 条'
+UNION ALL
+SELECT '4 只读函数存在',
+       EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n2 ON n2.oid=p.pronamespace
+                WHERE n2.nspname='public' AND p.proname='get_shared_schedule'),
+       'get_shared_schedule(text)'
+UNION ALL
+SELECT '5 函数为 SECURITY DEFINER',
+       coalesce((SELECT prosecdef FROM pg_proc WHERE proname='get_shared_schedule'
+                  AND pronamespace='public'::regnamespace LIMIT 1), false),
+       '内部需要绕过 RLS 读表'
+UNION ALL
+SELECT '6 匿名可执行该函数',
+       has_function_privilege('anon', 'public.get_shared_schedule(text)', 'EXECUTE'),
+       '老师免登录的前提'
+UNION ALL
+SELECT '7 members 无 anon 策略',
+       ((SELECT relrowsecurity FROM pg_class WHERE relname='members' AND relnamespace='public'::regnamespace) IS TRUE
+        AND (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='members' AND ('anon' = ANY(roles))) = 0),
+       '匿名读不到成员表'
+UNION ALL
+SELECT '8 share_links 策略仅限 authenticated',
+       ((SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='share_links' AND ('anon' = ANY(roles))) = 0),
+       '匿名只能走函数'
+UNION ALL
+SELECT '9 关键字段齐全',
+       ((SELECT count(*) FROM information_schema.columns WHERE table_name='share_links'
+          AND column_name IN ('token','expires_at','active','view_count','last_viewed_at')) = 5),
+       'token/expires_at/active/view_count/last_viewed_at';
