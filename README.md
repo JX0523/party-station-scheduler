@@ -74,12 +74,32 @@ npm run dev          # 开发服务器 http://localhost:5173
 npm run build        # 生产构建
 npm run lint         # 代码检查（必须 0 error）
 
-# 跑全部测试（在项目根目录）
-Get-ChildItem test-*.mjs | ForEach-Object { node $_ }   # PowerShell
-for f in test-*.mjs; do node "$f"; done               # bash
-# 说明：未安装依赖时，test-xlsx.mjs 与 test-runtime-smoke.mjs 会自动跳过（打印提示），
-#      其余套件纯 Node 可跑；执行 npm ci && npm run build 后再跑，即得完整 340 项。
+# 跑全部测试（在项目根目录执行）
+# PowerShell：
+Get-ChildItem test-*.mjs | ForEach-Object { $out = node $_.Name 2>&1; $out | Select-Object -Last 1 }
+# bash：
+for f in test-*.mjs; do node "$f" | tail -1; done
 ```
+
+**测试说明**
+
+- 24 个套件、**965 项检查**，全部通过约 40 秒（本机）；
+- `test-xlsx.mjs`、`test-runtime-smoke.mjs` 以及全部 `test-*-ui.mjs` **依赖构建产物**：
+  没 `npm ci` 或没 `npm run build` 时会自动跳过并打印提示（不算失败）；
+- 想拿到完整 965 项：先 `cd frontend && npm ci && npm run build`，再回到根目录跑上面那行；
+- 想只看某一类：`node test-algorithm.mjs`、`node test-share-route.mjs` 这样单独跑。
+
+**性能实测**（可选）
+
+```bash
+node bench-algorithm.mjs
+# 输出：60 人 × 20 周的规模下，单周生成耗时均值/中位数/P95、整学期条数与覆盖率
+```
+
+**CI 在跑什么**
+
+推送 master 即触发 `.github/workflows/ci.yml`：装依赖 → 跑 24 个套件 → 构建 → 跑运行时测试 → lint（必须 0 error）。
+失败时会把完整日志写回仓库 `ci-logs/last-failure.txt`，方便在看不到 GitHub 页面的环境里排查。
 
 **完整复现步骤**（含 Supabase 建表、演示数据、创建账号）：见 [CONTRIBUTING.md](CONTRIBUTING.md) 第一节。
 演示数据：在 Supabase SQL Editor 执行 `database/seed-demo.sql`，即可得到 6 名成员 + 课表 + 一周排班。
@@ -95,6 +115,24 @@ VITE_ALLOW_REGISTRATION=false   # true=开放登录页自助注册（默认关�
 ```
 
 GitHub Actions 部署时通过仓库 Secrets 注入：`VITE_SUPABASE_URL`、`VITE_SUPABASE_ANON_KEY`、`NETLIFY_AUTH_TOKEN`、`NETLIFY_SITE_ID`。
+
+## 部署
+
+| 环节 | 做法 |
+|---|---|
+| 构建 | `cd frontend && npm run build`，产物在 `frontend/dist` |
+| 主站 | 推送 master → GitHub Actions 自动发布到 **Netlify**（站点 `creative-brioche-5681d2`） |
+| 备用站 | 同一份代码发布到 **GitHub Pages**（子路径，`VITE_BASE` 区分） |
+| 密钥 | 仓库 Secrets 注入：`VITE_SUPABASE_URL`、`VITE_SUPABASE_ANON_KEY`、`NETLIFY_AUTH_TOKEN`、`NETLIFY_SITE_ID` |
+| 数据库变更 | 在 Supabase SQL Editor 里按顺序执行 `database/*.sql`（脚本幂等，可重复跑） |
+
+**只读分享功能上线前要按顺序跑三个脚本**（沙盒库与正式库各一次）：
+
+1. `database/migration-v8-share-links.sql`（建表 + 只读函数 + 权限）
+2. `database/test-share-links.sql`（7 项自测，返回 PASS/FAIL 表）
+3. `database/acceptance-share-links.sql`（9 项上线验收，返回汇总表）
+
+三步都通过后，页面才能正常生成分享链接；否则管理面板会提示“读取分享链接失败”。
 
 ## 文档索引
 
