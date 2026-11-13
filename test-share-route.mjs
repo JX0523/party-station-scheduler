@@ -213,6 +213,10 @@ function stubFetchPanelMissingTable() {
 }
 
 async function render(pathname, { loggedIn = false, stub = stubFetchShare, redirect = null } = {}) {
+  // 捕获运行期的 console.error（React 报错/警告都会走这里，等于“页面有没有暗病”的证据）
+  const consoleErrors = []
+  const originError = console.error
+  console.error = (...args) => { consoleErrors.push(String(args[0])) ; originError(...args) }
   const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', {
     url: 'https://example.com' + pathname,
     pretendToBeVisual: true,
@@ -244,7 +248,12 @@ async function render(pathname, { loggedIn = false, stub = stubFetchShare, redir
   stub()
   await import(pathToFileURL(BUNDLE).href + '?t=' + Date.now())
   await new Promise(r => setTimeout(r, 700))
-  return { window, rootHtml: window.document.getElementById('root')?.innerHTML || '' }
+  console.error = originError
+  return {
+    window,
+    consoleErrors,
+    rootHtml: window.document.getElementById('root')?.innerHTML || ''
+  }
 }
 
 let pass = 0, fail = 0
@@ -425,6 +434,14 @@ console.log('— 场景十：数据库未初始化时面板要明确提示 —')
   const { rootHtml } = await render('/semester', { loggedIn: true, stub: stubFetchPanelMissingTable })
   check('面板提示“读取分享链接失败”', rootHtml.includes('读取分享链接失败'))
   check('提示里说明可能是没跑迁移脚本', rootHtml.includes('迁移脚本') || rootHtml.includes('migration-v8'))
+}
+
+console.log('— 场景十一：正常渲染时不应出现任何运行时错误/警告 —')
+{
+  const { consoleErrors, rootHtml } = await render('/share/deadbeefdeadbeefdeadbeefdeadbeef')
+  check('分享页渲染无 console.error（无 React 报错/警告）',
+    consoleErrors.length === 0, consoleErrors.slice(0, 2).join(' | '))
+  check('页面内容确实渲染出来了', rootHtml.includes('张三'))
 }
 
 console.log('')
