@@ -127,6 +127,73 @@ function stubFetchPanel() {
   }
 }
 
+// 场景四：已登录 + 列表里已有一条链接（测停用/复制）
+let capturedUpdate = null
+const EXISTING_ROW = {
+  id: '11111111-2222-3333-4444-555555555555',
+  token: 'a'.repeat(26) + 'def456',   // 32 位，末 6 位为 def456（便于断言列表展示）
+  scope: 'current_week',
+  week_number: null,
+  expires_at: null,
+  active: true,
+  created_by: 'admin@example.com',
+  created_at: new Date().toISOString(),
+  last_viewed_at: null,
+  view_count: 3
+}
+
+function stubFetchPanelWithRow() {
+  const json = (data, status = 200) => new Response(JSON.stringify(data), {
+    status, headers: { 'Content-Type': 'application/json' } })
+  globalThis.fetch = async (input, init = {}) => {
+    const url = typeof input === 'string' ? input : (input && input.url) || ''
+    const method = (init.method || 'GET').toUpperCase()
+    if (url.includes('/auth/v1/user')) return json(makeSession().user)
+    if (url.includes('/auth/v1/')) return json({})
+    if (url.includes('/rest/v1/share_links') && (method === 'PATCH' || method === 'PUT')) {
+      capturedUpdate = JSON.parse(init.body || '{}')
+      return json([{}], 200)
+    }
+    if (url.includes('/rest/v1/share_links') && method === 'POST') {
+      capturedInsert = JSON.parse(init.body || '{}')
+      return json([{}], 201)
+    }
+    if (url.includes('/rest/v1/share_links')) return json([EXISTING_ROW])
+    if (url.includes('/rest/v1/')) return json([])
+    return json({})
+  }
+}
+
+// 场景五：分享接口返回错误
+function stubRpcError(code) {
+  return function () {
+    const json = (data, status = 200) => new Response(JSON.stringify(data), {
+      status, headers: { 'Content-Type': 'application/json' } })
+    globalThis.fetch = async (input) => {
+      const url = typeof input === 'string' ? input : (input && input.url) || ''
+      if (url.includes('/rest/v1/rpc/get_shared_schedule')) return json({ ok: false, error: code })
+      if (url.includes('/auth/v1/')) return json({})
+      if (url.includes('/rest/v1/')) return json([])
+      return json({})
+    }
+  }
+}
+
+// 场景六：接口成功但没有排班
+function stubRpcEmpty() {
+  const json = (data, status = 200) => new Response(JSON.stringify(data), {
+    status, headers: { 'Content-Type': 'application/json' } })
+  globalThis.fetch = async (input) => {
+    const url = typeof input === 'string' ? input : (input && input.url) || ''
+    if (url.includes('/rest/v1/rpc/get_shared_schedule')) {
+      return json({ ok: true, week: 8, week_type: '双周', items: [], updated_at: new Date().toISOString(), server_time: new Date().toISOString() })
+    }
+    if (url.includes('/auth/v1/')) return json({})
+    if (url.includes('/rest/v1/')) return json([])
+    return json({})
+  }
+}
+
 async function render(pathname, { loggedIn = false, stub = stubFetchShare, redirect = null } = {}) {
   const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', {
     url: 'https://example.com' + pathname,
@@ -214,6 +281,59 @@ console.log('— 场景三：GitHub Pages 深链恢复（404 跳回首页后应�
   check('sessionStorage 里的 redirect 已被清空', !window.sessionStorage.getItem('redirect'))
 }
 
+console.log('— 场景四：管理面板的停用/复制（管理员日常操作）—')
+{
+  capturedUpdate = null
+  const { window, rootHtml } = await render('/semester', { loggedIn: true, stub: stubFetchPanelWithRow })
+  check('列表渲染出已有链接（显示“生效”与访问次数）',
+    rootHtml.includes('生效') && rootHtml.includes('3'))
+  check('列表显示令牌后 6 位', rootHtml.includes('def456'))
+
+  const toggleBtn = Array.from(window.document.querySelectorAll('button'))
+    .find(b => (b.textContent || '').trim() === '停用')
+  check('找到“停用”按钮', !!toggleBtn)
+  if (toggleBtn) {
+    toggleBtn.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }))
+    await new Promise(r => setTimeout(r, 500))
+    const html2 = window.document.getElementById('root')?.innerHTML || ''
+    check('点“停用”发出了更新请求', capturedUpdate !== null)
+    check('更新内容为 active=false', capturedUpdate && capturedUpdate.active === false)
+    check('页面给出了操作反馈', html2.includes('已停用') || html2.includes('停用该链接'))
+  }
+
+  // 剪贴板在 jsdom 中不可用：点“复制”必须优雅降级，不能白屏
+  const copyBtn = Array.from(window.document.querySelectorAll('button'))
+    .find(b => (b.textContent || '').trim() === '复制')
+  check('找到“复制”按钮', !!copyBtn)
+  if (copyBtn) {
+    copyBtn.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }))
+    await new Promise(r => setTimeout(r, 300))
+    const html3 = window.document.getElementById('root')?.innerHTML || ''
+    check('剪贴板不可用时给出提示而非崩溃',
+      html3.includes('复制失败') || html3.includes('手动复制') || html3.includes('已复制'))
+    check('页面仍然正常（未白屏）', html3.includes('分享给老师'))
+  }
+}
+
+console.log('— 场景五：分享页的三类错误态 —')
+{
+  const cases = [
+    ['revoked', '已被管理员停用'],
+    ['expired', '已过期'],
+    ['invalid_token', '链接无效']
+  ]
+  for (const [code, expect] of cases) {
+    const { rootHtml } = await render('/share/deadbeefdeadbeefdeadbeefdeadbeef', { stub: stubRpcError(code) })
+    check(`${code} → 显示「${expect}」`, rootHtml.includes(expect))
+  }
+}
+
+console.log('— 场景六：本周尚未排班（空态）—')
+{
+  const { rootHtml } = await render('/share/deadbeefdeadbeefdeadbeefdeadbeef', { stub: stubRpcEmpty })
+  check('显示「本周尚未排班」而不是空白页', rootHtml.includes('尚未排班'))
+}
+
 console.log('')
-console.log(`${pass}/${pass + fail} 通过` + (fail === 0 ? '（分享页免登录 + 面板生成链路 + 深链恢复均正常）' : ''))
+console.log(`${pass}/${pass + fail} 通过` + (fail === 0 ? '（分享页免登录 + 面板生成 + 面板停用/复制 + 错误态 + 空态 + 深链恢复均正常）' : ''))
 process.exit(fail === 0 ? 0 : 1)
