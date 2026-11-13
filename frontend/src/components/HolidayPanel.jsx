@@ -75,19 +75,23 @@ export default function HolidayPanel({ config, onChanged }) {
     try {
       const set = toWeekDaySet(r.days)
       let done = 0
+      let writeError = null
       for (const item of set) {
         const { data: exist } = await supabase.from('day_config')
           .select('id').eq('week_number', item.week).eq('day_of_week', item.day).maybeSingle()
-        if (exist) {
-          await supabase.from('day_config').update({
-            is_workday: false, substitute_for: null, substitute_for_odd: null, substitute_for_even: null
-          }).eq('id', exist.id)
-        } else {
-          await supabase.from('day_config').insert({
-            week_number: item.week, day_of_week: item.day, is_workday: false
-          })
-        }
+        const { error: writeErr } = exist
+          ? await supabase.from('day_config').update({
+              is_workday: false, substitute_for: null, substitute_for_odd: null, substitute_for_even: null
+            }).eq('id', exist.id)
+          : await supabase.from('day_config').insert({
+              week_number: item.week, day_of_week: item.day, is_workday: false
+            })
+        if (writeErr) { writeError = writeErr.message; break }
         done++
+      }
+      if (writeError) {
+        await loadRows()
+        return flash('error', `设为放假失败：${writeError}（已成功 ${done} 天，请重试或检查数据库权限）`)
       }
       await loadRows()
       if (onChanged) onChanged()

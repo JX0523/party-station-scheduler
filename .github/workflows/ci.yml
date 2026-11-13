@@ -1,4 +1,4 @@
-# 持续集成：每次推送/PR 自动跑测试、构建、代码检查（无需任何密钥）
+﻿# 持续集成：每次推送/PR 自动跑测试、构建、代码检查（无需任何密钥）
 name: CI
 on:
   push:
@@ -85,8 +85,19 @@ jobs:
         working-directory: frontend
         run: npm run build
 
-      - name: 运行时冒烟测试（真实加载构建产物，逐页渲染）
-        run: node test-runtime-smoke.mjs
+      - name: 运行时冒烟测试（真实加载构建产物，逐页渲染 + 分享页）
+        shell: bash
+        run: |
+          node test-runtime-smoke.mjs
+          if [ -f test-share-route.mjs ]; then node test-share-route.mjs; fi
+          if [ -f test-scheduling-ui.mjs ]; then node test-scheduling-ui.mjs; fi
+          if [ -f test-holiday-ui.mjs ]; then node test-holiday-ui.mjs; fi
+          if [ -f test-members-ui.mjs ]; then node test-members-ui.mjs; fi
+          if [ -f test-course-ui.mjs ]; then node test-course-ui.mjs; fi
+          if [ -f test-dashboard-ui.mjs ]; then node test-dashboard-ui.mjs; fi
+          if [ -f test-config-ui.mjs ]; then node test-config-ui.mjs; fi
+          if [ -f test-console-clean.mjs ]; then node test-console-clean.mjs; fi
+          if [ -f test-stats-ui.mjs ]; then node test-stats-ui.mjs; fi
 
       - name: 代码检查（必须 0 error）
         working-directory: frontend

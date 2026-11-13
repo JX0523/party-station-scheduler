@@ -79,11 +79,10 @@ export default function Scheduling() {
     const { data: existing } = await supabase.from('slot_config')
       .select('id').eq('day_of_week', day).eq('slot', slot).maybeSingle()
 
-    if (existing) {
-      await supabase.from('slot_config').update({ required_count: val }).eq('id', existing.id)
-    } else {
-      await supabase.from('slot_config').insert({ day_of_week: day, slot, required_count: val })
-    }
+    const { error: saveErr } = existing
+      ? await supabase.from('slot_config').update({ required_count: val }).eq('id', existing.id)
+      : await supabase.from('slot_config').insert({ day_of_week: day, slot, required_count: val })
+    if (saveErr) return showToast('调整失败：' + saveErr.message, 'error')
 
     await loadSlotConfig()
     setEditingSlot(null)
@@ -133,14 +132,24 @@ export default function Scheduling() {
 
       // 有结果才先删后插；算法返回 0 条时（如全员课表冲突）保留原排班，避免误清空
       if (result.assignments.length > 0) {
-        await supabase.from('assignments').delete().eq('week_number', weekNumber)
-        await supabase.from('assignments').insert(result.assignments)
+        const { error: delErr } = await supabase.from('assignments').delete().eq('week_number', weekNumber)
+        if (delErr) {
+          // 删除失败就不要继续插入，避免同一周出现新旧混合的两套排班
+          showToast('生成失败：无法清除该周旧排班（' + delErr.message + '）', 'error')
+          return
+        }
+        const { error: insErr } = await supabase.from('assignments').insert(result.assignments)
+        if (insErr) {
+          showToast('生成失败：写入排班时出错（' + insErr.message + '）', 'error')
+          return
+        }
       }
       // 只清除「上周」的补排标记（本周已补排，不再重复优先）
       if (makeUpMembers && makeUpMembers.length > 0) {
-        await supabase.from('assignments')
+        const { error: clearErr } = await supabase.from('assignments')
           .update({ leave_next_week: false })
           .eq('leave_next_week', true).eq('week_number', weekNumber - 1)
+        if (clearErr) console.warn('清除上周补排标记失败（不影响本次排班）:', clearErr.message)
       }
 
       loadAssignments()
@@ -159,10 +168,15 @@ export default function Scheduling() {
     if (isLocked) return showToast('该周已锁定，无法修改', 'error')
     if (!confirm(`确定将 ${assignment.members?.name} 标记为请假吗？\n\n请假后该同学本次值班不计时长，下周将要求补排。`)) return
 
-    await supabase.from('assignments').update({
+    // 请假没写成功就不能继续选替补（否则会出现“替补已安排、请假却没记上”的脏数据）
+    const { error: leaveErr } = await supabase.from('assignments').update({
       status: '请假',
       leave_next_week: true
     }).eq('id', assignment.id)
+    if (leaveErr) {
+      showToast('请假失败：' + leaveErr.message, 'error')
+      return
+    }
 
     // 找替补
     const weekType = isOddWeek(weekNumber) ? '单周' : '双周'
@@ -293,7 +307,8 @@ export default function Scheduling() {
 
       {/* 工作日配置 */}
       <div style={{ marginBottom: 12 }}>
-        <DaySelector weekNumber={weekNumber} locked={isLocked} onChange={setDayConfig} />
+        <DaySelector weekNumber={weekNumber} locked={isLocked} onChange={setDayConfig}
+          onError={(msg) => showToast(msg, 'error')} />
       </div>
 
       {/* 提示：点击表头数字可调整时段人数 */}

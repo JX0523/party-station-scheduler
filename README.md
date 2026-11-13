@@ -3,7 +3,7 @@
 [![CI](https://github.com/JX0523/party-station-scheduler/actions/workflows/ci.yml/badge.svg)](https://github.com/JX0523/party-station-scheduler/actions/workflows/ci.yml)
 [![Deploy](https://github.com/JX0523/party-station-scheduler/actions/workflows/deploy.yml/badge.svg)](https://github.com/JX0523/party-station-scheduler/actions/workflows/deploy.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-![Tests](https://img.shields.io/badge/tests-788%20passed-brightgreen)
+![Tests](https://img.shields.io/badge/tests-965%20passed-brightgreen)
 
 为大学党员工作站设计的 **Web 排班管理系统**：管理员在浏览器上完成成员管理、课表录入、自动排班、请假替补、**按日期放假**、值班统计等全流程工作，替代手工排班。
 
@@ -41,7 +41,7 @@
 | 数据 | Supabase：PostgreSQL 15、Auth（邮箱密码）、RLS 行级安全 |
 | 导出 | SheetJS (xlsx) |
 | 部署 | GitHub Pages + Netlify，GitHub Actions 自动构建 |
-| 测试 | 单元 + 模糊 + 冒烟 + 授权合规（**788 项检查**：含 400 随机场景、16 项页面真实渲染、42 项 DB 授权检查） |
+| 测试 | 单元 + 模糊 + 冒烟 + 授权合规（**965 项检查**：含 400 随机场景、16 项页面真实渲染、42 项 DB 授权检查、13 项分享功能链路） |
 
 ## 项目结构
 
@@ -58,7 +58,7 @@
 │   ├── src/pages/  src/components/          # 页面与组件
 │   └── vendor/xlsx-0.20.3.tgz               # 内置修复版依赖（离线可装）
 ├── database/                                # schema.sql + 迁移脚本 + seed-demo.sql（演示数据）
-├── test-*.mjs                               # 13 个测试套件（788 项检查：单元 + 模糊 + 运行时渲染）
+├── test-*.mjs                               # 24 个测试套件（965 项检查，含界面测试）
 ├── tools/                                   # 运维脚本：系统审计 / 数据备份 / 数据恢复
 └── .github/                                 # CI、部署、保活、Issue/PR 模板
 ```
@@ -118,17 +118,28 @@ GitHub Actions 部署时通过仓库 Secrets 注入：`VITE_SUPABASE_URL`、`VIT
 | test-algorithm.mjs | 27 | 算法核心场景（排班生成、角色配额、课表冲突） |
 | test-basic-functionality.mjs | 59 | 基础功能（resolveScheduleKey / 配额 / 校验 / 边界） |
 | test-comprehensive.mjs | 49 | 大规模综合用户场景 |
+| test-config-ui.mjs | 14 | 学期设置必填校验、时段配置 21 条保存 |
+| test-console-clean.mjs | 8 | 全站控制台零错误巡检（8 个路由） |
+| test-course-ui.mjs | 13 | 课表页：单双周分离、21 格保存、复制到另一周 |
+| test-dashboard-ui.mjs | 10 | 首页：本周无排班自动生成、已有排班不覆盖 |
+| test-doc-claims.mjs | 25 | 文档一致性：配额公式、每周上限、放假、紧急模式、调休、源码常量 |
 | test-edge-cases.mjs | 20 | 极端输入、功能叠加、并发边界 |
 | test-equivalence-classes.mjs | 62 | 等价类全覆盖（8 个维度） |
 | test-fixed-behaviors.mjs | 14 | 关键修复回归 |
 | test-full-semester.mjs | 14 | 整学期连续排班模拟 |
 | test-fuzz-invariants.mjs | 400 | 随机模糊：400 场景 × 11 条不变量（可复现种子） |
+| test-golden-example.mjs | 11 | 白板手算示例金标准（讲义/速查卡示例必须与代码一致） |
 | test-holiday-dates.mjs | 43 | 放假：日期换算、自动推算、预览文案、不排班 |
+| test-holiday-ui.mjs | 9 | 放假面板：取消放假（含删除 0 行的拦截） |
+| test-members-ui.mjs | 11 | 成员页：停用≠删除、删除二次确认 |
 | test-phase1-fix.mjs | 34 | 课表冲突与调休（第一阶段修复回归） |
 | test-runtime-smoke.mjs | 16 | 运行时冒烟：真实加载构建产物逐页渲染 |
-| test-schema-grants.mjs | 42 | 数据库授权合规（GRANT / RLS / 策略） |
+| test-scheduling-ui.mjs | 20 | 排班页：请假标记、缺人提示、请假→替补链路、写入失败即报错 |
+| test-schema-grants.mjs | 43 | 数据库授权合规（GRANT / RLS / 策略） |
+| test-share-route.mjs | 45 | 只读分享：免登录、生成/停用/复制/删除、错误态、空态、深链、自动刷新 |
+| test-stats-ui.mjs | 10 | 统计导出：时长/请假次数计算、导出不报错、视图切换 |
 | test-xlsx.mjs | 8 | Excel 导入导出往返（xlsx 0.20.3） |
-| **合计** | **788** | 全部通过（CI 每次提交都会跑；界面测试需先构建） |
+| **合计** | **965** | 全部通过（CI 每次提交都会跑；界面测试需先构建） |
 
 ## 已知注意点
 

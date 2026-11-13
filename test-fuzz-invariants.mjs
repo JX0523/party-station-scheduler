@@ -1,9 +1,9 @@
-/**
+﻿/**
  * 随机模糊测试 + 不变量校验（test-fuzz-invariants.mjs）
  *
  * 思路：用固定种子的伪随机数生成大量「形状各异」的排班场景（人数/角色/课表/时段需求/
  *      工作日与调休/放假/模式/上周已排/补排人员全都随机），然后逐条校验算法必须满足的
- *      不变量。任何一条被打破 = 真实 bug，且能用打印出的种子精确复现。
+ *      不变量（含角色配额）。任何一条被打破 = 真实 bug，且能用打印出的种子精确复现。
  *
  * 运行: node test-fuzz-invariants.mjs [轮数] [起始种子]
  */
@@ -183,6 +183,24 @@ function checkInvariants(res, sc) {
   if (sc.mode === '紧急') A.forEach(a => { if (a.is_emergency !== true) errs.push('I10 紧急模式未标记 is_emergency') })
   else A.forEach(a => { if (a.is_emergency === true) errs.push('I10 一般模式误标 is_emergency') })
 
+  // I11 角色配额：部长 / 主席团人数不得超过本周配额（补排人员豁免）
+  //     业务含义：部长每周最多 1—3 人、主席团只在部员+部长不足 5 人时启用；
+  //     补排是“上周请假必补”的承诺，允许突破配额（见算法第 204—211 行注释）。
+  const roleOf = {}
+  sc.members.forEach(m => { roleOf[m.id] = m.role })
+  const nonMakeUpByRole = {}
+  A.forEach(a => {
+    const role = roleOf[a.member_id]
+    if (!role) return
+    if (makeUpIds.has(a.member_id)) return
+    nonMakeUpByRole[role] = (nonMakeUpByRole[role] || 0) + 1
+  })
+  Object.entries(nonMakeUpByRole).forEach(([role, c]) => {
+    const cap = meta.perRoleMax ? meta.perRoleMax[role] : undefined
+    if (cap === undefined) return
+    if (c > cap) errs.push(`I11 角色「${role}」超出本周配额: ${c} > ${cap}（补排已豁免）`)
+  })
+
   return errs
 }
 
@@ -203,7 +221,7 @@ function run(sc) {
 }
 
 console.log('='.repeat(66))
-console.log(`🧪 随机模糊测试：${ROUNDS} 个随机场景 × 10 条不变量`)
+console.log(`🧪 随机模糊测试：${ROUNDS} 个随机场景 × 11 条不变量`)
 console.log('   种子范围: ' + START_SEED + ' ~ ' + (START_SEED + ROUNDS - 1))
 console.log('='.repeat(66))
 
