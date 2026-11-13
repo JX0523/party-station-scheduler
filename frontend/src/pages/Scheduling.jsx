@@ -307,7 +307,8 @@ export default function Scheduling() {
 
       {/* 工作日配置 */}
       <div style={{ marginBottom: 12 }}>
-        <DaySelector weekNumber={weekNumber} locked={isLocked} onChange={setDayConfig} />
+        <DaySelector weekNumber={weekNumber} locked={isLocked} onChange={setDayConfig}
+          onError={(msg) => showToast(msg, 'error')} />
       </div>
 
       {/* 提示：点击表头数字可调整时段人数 */}

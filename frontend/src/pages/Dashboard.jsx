@@ -134,13 +134,22 @@ export default function Dashboard() {
       })
 
       if (result.assignments.length > 0) {
-        await supabase.from('assignments').delete().eq('week_number', cw)
-        await supabase.from('assignments').insert(result.assignments)
+        const { error: delErr } = await supabase.from('assignments').delete().eq('week_number', cw)
+        if (delErr) {
+          showToast('自动生成失败：无法清除该周旧排班（' + delErr.message + '）', 'error')
+          return
+        }
+        const { error: insErr } = await supabase.from('assignments').insert(result.assignments)
+        if (insErr) {
+          showToast('自动生成失败：写入排班出错（' + insErr.message + '）', 'error')
+          return
+        }
         // 只清除「上周」的补排标记（本周已补排，不再重复优先）
         if (makeUpMembers && makeUpMembers.length > 0) {
-          await supabase.from('assignments')
+          const { error: clearErr } = await supabase.from('assignments')
             .update({ leave_next_week: false })
             .eq('leave_next_week', true).eq('week_number', cw - 1)
+          if (clearErr) console.warn('清除上周补排标记失败（不影响本次排班）:', clearErr.message)
         }
       }
 
@@ -408,7 +417,8 @@ export default function Dashboard() {
 
       {/* ===== 工作日配置 ===== */}
       <div style={{ marginBottom: 12 }}>
-        <DaySelector key={dayConfigVersion} weekNumber={cw} locked={false} onChange={setDayConfig} />
+        <DaySelector key={dayConfigVersion} weekNumber={cw} locked={false} onChange={setDayConfig}
+          onError={(msg) => showToast(msg, 'error')} />
       </div>
 
       {/* ===== 本周值班表（大，可操作） ===== */}

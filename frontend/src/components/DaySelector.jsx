@@ -14,7 +14,7 @@ const DAY_FULL = ['周一', '周二', '周三', '周四', '周五', '周六', '�
  * @param {boolean} locked - 是否锁定
  * @param {function} onChange - 变更回调，接收 rich dayConfig
  */
-export default function DaySelector({ weekNumber, locked, onChange }) {
+export default function DaySelector({ weekNumber, locked, onChange, onError }) {
   // dayConfig[1..7] = { isWorkday: true/false, substituteForOdd: null|1-5, substituteForEven: null|1-5 }
   const [dayConfig, setDayConfig] = useState({})
   const [saving, setSaving] = useState(false)
@@ -88,23 +88,26 @@ export default function DaySelector({ weekNumber, locked, onChange }) {
       .eq('day_of_week', day)
       .maybeSingle()
 
-    if (existing) {
-      await supabase.from('day_config').update({
-        is_workday: newIsWorkday,
-        substitute_for: null,
-        substitute_for_odd: newSubOdd,
-        substitute_for_even: newSubEven
-      }).eq('id', existing.id)
-    } else {
-      await supabase.from('day_config').insert({
-        week_number: weekNumber,
-        day_of_week: day,
-        is_workday: newIsWorkday,
-        substitute_for_odd: newSubOdd,
-        substitute_for_even: newSubEven
-      })
-    }
+    const { error: saveError } = existing
+      ? await supabase.from('day_config').update({
+          is_workday: newIsWorkday,
+          substitute_for: null,
+          substitute_for_odd: newSubOdd,
+          substitute_for_even: newSubEven
+        }).eq('id', existing.id)
+      : await supabase.from('day_config').insert({
+          week_number: weekNumber,
+          day_of_week: day,
+          is_workday: newIsWorkday,
+          substitute_for_odd: newSubOdd,
+          substitute_for_even: newSubEven
+        })
     setSaving(false)
+    if (saveError) {
+      // 不能让用户以为“改了工作日/调休”，实际没存上
+      if (onError) onError('保存工作日配置失败：' + saveError.message)
+      else console.error('保存工作日配置失败:', saveError.message)
+    }
   }
 
   /**
