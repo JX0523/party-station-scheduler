@@ -21,8 +21,17 @@ npm ci        # 若网络慢：npm ci --registry=https://registry.npmmirror.com
 
 ### 3. 建数据库（Supabase → SQL Editor，按顺序执行）
 1. `database/schema.sql` —— 建表 + RLS 策略 + GRANT
-2. `database/seed-demo.sql` —— **可选**：灌入演示数据（6 名成员 + 课表 + 一周排班），便于直接看到效果
-3. 如需登录：Supabase → Authentication → Users → **Add user**（邮箱 + 密码）
+2. `database/migration-v4-assignments-unique.sql` —— 同人同周同时段唯一约束
+3. `database/migration-v5-keepalive.sql` —— 保活心跳表
+4. `database/migration-v6-data-api-grants.sql` —— 显式 GRANT（Supabase 2026-10-30 起新表必须）
+5. `database/migration-v7-day-config-delete-policy.sql` —— “取消放假”需要的 DELETE 策略
+6. `database/migration-v8-share-links.sql` —— **只读分享**：share_links 表 + 只读函数 + 权限
+7. `database/seed-demo.sql` —— **可选**：演示数据（6 名成员 + 课表 + 一周排班）
+8. 如需登录：Supabase → Authentication → Users → **Add user**（邮箱 + 密码）
+
+> 迁移脚本是**幂等**的（`IF NOT EXISTS` / `CREATE OR REPLACE` / `DROP POLICY IF EXISTS`），重复执行不会出错。
+> 跑完想做功能自检：再执行 `database/test-share-links.sql`（7 项，返回 PASS/FAIL 表）与
+> `database/acceptance-share-links.sql`（9 项上线验收）。
    > 本项目**默认关闭自助注册**（`VITE_ALLOW_REGISTRATION` 控制），账号由管理员创建
 
 ### 4. 配置环境变量
@@ -50,7 +59,10 @@ for f in test-*.mjs; do node "$f"; done                   # bash
 #      未执行 npm ci 时它会打印提示并自动跳过，不会报错。
 ```
 
-当前基线：**340 项检查全部通过**（324 项纯 Node 单元测试 + 16 项运行时冒烟渲染）。你的改动**不应让任何一项失败**。
+当前基线：**24 个套件、965 项检查全部通过**。你的改动**不应让任何一项失败**。
+
+> 注意：`test-*-ui.mjs`、`test-runtime-smoke.mjs`、`test-xlsx.mjs` 都依赖 `frontend/node_modules` 与构建产物；
+> 没跑过 `npm ci && npm run build` 时它们会自动跳过并打印提示——**跳过不算通过**，要拿到完整 965 项必须先构建。
 
 | 套件 | 覆盖内容 |
 |------|---------|
