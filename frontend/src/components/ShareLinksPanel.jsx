@@ -22,6 +22,7 @@ export default function ShareLinksPanel({ currentWeek = 1, totalWeeks = 20 }) {
   const [days, setDays] = useState(30)
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState(null)
+  const [latest, setLatest] = useState('')
 
   const flash = (type, text) => { setMsg({ type, text }); setTimeout(() => setMsg(null), 5000) }
 
@@ -33,20 +34,27 @@ export default function ShareLinksPanel({ currentWeek = 1, totalWeeks = 20 }) {
   useEffect(() => { load() }, [load])
 
   async function handleCreate() {
+    // 指定周时校验周次，避免写入 NaN
+    const weekNum = Number(week)
+    if (scope === 'week' && (!Number.isFinite(weekNum) || weekNum < 1 || weekNum > totalWeeks)) {
+      return flash('error', `请输入 1—${totalWeeks} 之间的周次`)
+    }
     setBusy(true)
     try {
       const { data: userData } = await supabase.auth.getUser()
       const expires = days > 0 ? new Date(Date.now() + days * 86400000).toISOString() : null
+      const token = genToken()
       const { error } = await supabase.from('share_links').insert({
-        token: genToken(),
+        token,
         scope,
-        week_number: scope === 'week' ? Number(week) : null,
+        week_number: scope === 'week' ? weekNum : null,
         expires_at: expires,
         created_by: (userData && userData.user && userData.user.email) || null
       })
       if (error) return flash('error', '生成失败：' + error.message)
+      setLatest(shareUrl(token))
       await load()
-      flash('success', '已生成分享链接')
+      flash('success', '已生成分享链接（下方可直接复制）')
     } finally { setBusy(false) }
   }
 
@@ -116,6 +124,17 @@ export default function ShareLinksPanel({ currentWeek = 1, totalWeeks = 20 }) {
           color: msg.type === 'error' ? '#c62828' : '#2e7d32' }}>{msg.text}</div>
       )}
 
+      {latest && (
+        <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+          <input className="form-input" readOnly value={latest} onFocus={e => e.target.select()}
+            style={{ flex: 1, fontSize: 12.5, fontFamily: 'monospace' }} />
+          <button className="btn btn-secondary" onClick={async () => {
+            try { await navigator.clipboard.writeText(latest); flash('success', '已复制') }
+            catch { flash('error', '请手动选中复制') }
+          }}>复制</button>
+        </div>
+      )}
+
       {list.length === 0 ? (
         <div style={{ color: '#999', fontSize: 13 }}>还没有分享链接</div>
       ) : (
@@ -136,7 +155,11 @@ export default function ShareLinksPanel({ currentWeek = 1, totalWeeks = 20 }) {
                 <td style={cell}>{r.view_count || 0}</td>
                 <td style={cell}>{r.last_viewed_at ? new Date(r.last_viewed_at).toLocaleString('zh-CN') : '—'}</td>
                 <td style={cell}>
-                  <span style={{ color: r.active ? '#2e7d32' : '#c62828' }}>{r.active ? '生效' : '已停用'}</span>
+                  {(() => {
+                    const expired = r.expires_at && new Date(r.expires_at).getTime() < Date.now()
+                    if (expired) return <span style={{ color: '#ef6c00' }}>已过期</span>
+                    return <span style={{ color: r.active ? '#2e7d32' : '#c62828' }}>{r.active ? '生效' : '已停用'}</span>
+                  })()}
                 </td>
                 <td style={cell}>
                   <button className="btn btn-small btn-secondary" onClick={() => handleCopy(r.token)}>复制</button>{' '}
