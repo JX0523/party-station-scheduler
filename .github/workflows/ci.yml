@@ -96,6 +96,7 @@ jobs:
           if [ -f test-course-ui.mjs ]; then node test-course-ui.mjs; fi
           if [ -f test-dashboard-ui.mjs ]; then node test-dashboard-ui.mjs; fi
           if [ -f test-config-ui.mjs ]; then node test-config-ui.mjs; fi
+          if [ -f test-console-clean.mjs ]; then node test-console-clean.mjs; fi
 
       - name: 代码检查（必须 0 error）
         working-directory: frontend
