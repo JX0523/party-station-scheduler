@@ -1,4 +1,4 @@
-﻿# 持续集成：每次推送/PR 自动跑测试、构建、代码检查（无需任何密钥）
+# 持续集成：每次推送/PR 自动跑测试、构建、代码检查（无需任何密钥）
 name: CI
 on:
   push:
@@ -7,9 +7,14 @@ on:
       - '**/*.md'
       - 'docs/**'
       - 'dev-logs/**'
+      - 'ci-logs/**'
       - '.gitignore'
   pull_request:             # 合并前的质量门禁
   workflow_dispatch:
+
+permissions:
+  contents: write           # 失败时把日志写回仓库，便于本地排查（DSH 读不到 GitHub 页面）
+
 jobs:
   test:
     name: 测试 / 构建 / 代码检查
@@ -25,15 +30,16 @@ jobs:
           node --version
           npm --version
           echo "runner: $RUNNER_OS / $RUNNER_ARCH"
-        shell: bash
+          git log -1 --oneline
 
       - name: 安装依赖
         working-directory: frontend
         shell: bash
         run: |
-          npm ci --no-audit --no-fund || {
+          set -o pipefail
+          npm ci --no-audit --no-fund 2>&1 | tee ../../ci-failure.log || {
             echo "::warning::npm ci 失败，回退到 npm install 继续验证代码"
-            npm install --no-audit --no-fund
+            npm install --no-audit --no-fund 2>&1 | tee -a ../../ci-failure.log
           }
 
       - name: 运行全部测试
@@ -45,21 +51,30 @@ jobs:
           for f in test-*.mjs; do
             echo "━━━━━━ $f ━━━━━━"
             out=$(node "$f" 2>&1); code=$?
-            echo "$out" | tail -6
+            echo "$out" | tail -20
             if [ $code -ne 0 ]; then
-              echo "::error file=$f::$f 执行失败（退出码 $code）"
+              {
+                echo ""
+                echo "==================== $f 失败（退出码 $code）===================="
+                echo "$out"
+              } >> ci-failure.log
+              echo "::error file=$f::$f 执行失败（退出码 $code，完整输出见 ci-logs/last-failure.txt）"
               failed=$((failed + 1)); continue
             fi
             summary=$(echo "$out" | grep -oE '[0-9]+/[0-9]+ 通过' | tail -1)
             if [ -z "$summary" ]; then
-              # 退出码为 0 但没有汇总 = 该套件主动跳过（例如未构建/未装依赖时的冒烟与 xlsx 测试）
               echo "  ⏭️  $f 已跳过（依赖或构建产物缺失，属预期行为）"
               skipped=$((skipped + 1)); continue
             fi
             pass=${summary%%/*}
             all=$(echo "$summary" | cut -d/ -f2 | cut -d' ' -f1)
             if [ "$pass" != "$all" ]; then
-              echo "::error file=$f::$pass/$all 通过，存在失败用例"
+              {
+                echo ""
+                echo "==================== $f 有失败用例（$pass/$all）===================="
+                echo "$out"
+              } >> ci-failure.log
+              echo "::error file=$f::$pass/$all 通过，存在失败用例（完整输出见 ci-logs/last-failure.txt）"
               failed=$((failed + 1)); continue
             fi
             total=$((total + all))
@@ -70,9 +85,6 @@ jobs:
             exit 1
           fi
           echo "✅ 测试通过，共 $total 项；跳过 $skipped 个套件"
-          if [ $skipped -gt 0 ]; then
-            echo "（跳过的套件会在后续「生产构建」与「运行时冒烟测试」步骤中被真正执行）"
-          fi
 
       - name: 准备环境变量（CI 使用占位值；真实值由 deploy.yml 从 Secrets 注入）
         run: |
@@ -83,27 +95,64 @@ jobs:
 
       - name: 生产构建
         working-directory: frontend
-        run: npm run build
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run build 2>&1 | tee -a ../ci-failure.log
 
       - name: 运行时冒烟测试（真实加载构建产物，逐页渲染 + 分享页）
         shell: bash
         run: |
-          node test-runtime-smoke.mjs
-          if [ -f test-share-route.mjs ]; then node test-share-route.mjs; fi
-          if [ -f test-scheduling-ui.mjs ]; then node test-scheduling-ui.mjs; fi
-          if [ -f test-holiday-ui.mjs ]; then node test-holiday-ui.mjs; fi
-          if [ -f test-members-ui.mjs ]; then node test-members-ui.mjs; fi
-          if [ -f test-course-ui.mjs ]; then node test-course-ui.mjs; fi
-          if [ -f test-dashboard-ui.mjs ]; then node test-dashboard-ui.mjs; fi
-          if [ -f test-config-ui.mjs ]; then node test-config-ui.mjs; fi
-          if [ -f test-console-clean.mjs ]; then node test-console-clean.mjs; fi
-          if [ -f test-stats-ui.mjs ]; then node test-stats-ui.mjs; fi
+          set +e
+          for f in test-runtime-smoke.mjs test-share-route.mjs test-scheduling-ui.mjs test-holiday-ui.mjs \
+                   test-members-ui.mjs test-course-ui.mjs test-dashboard-ui.mjs test-config-ui.mjs \
+                   test-console-clean.mjs test-stats-ui.mjs; do
+            [ -f "$f" ] || continue
+            out=$(node "$f" 2>&1); code=$?
+            echo "── $f（退出码 $code）"
+            echo "$out" | tail -12
+            if [ $code -ne 0 ]; then
+              {
+                echo ""
+                echo "==================== [运行时] $f 失败（退出码 $code）===================="
+                echo "$out"
+              } >> ci-failure.log
+              echo "::error file=$f::$f 运行时测试失败（完整输出见 ci-logs/last-failure.txt）"
+              exit 1
+            fi
+          done
 
       - name: 代码检查（必须 0 error）
         working-directory: frontend
-        run: npm run lint
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run lint 2>&1 | tee -a ../ci-failure.log
 
       - name: 依赖安全审计（仅报告，不阻塞）
         working-directory: frontend
         continue-on-error: true
         run: npm audit --omit=dev || true
+
+      - name: 失败时把日志写回仓库（便于 DSH 本地排查）
+        if: failure()
+        shell: bash
+        run: |
+          set -e
+          mkdir -p ci-logs
+          {
+            echo "# CI 失败日志"
+            echo ""
+            echo "- 提交：$(git rev-parse --short HEAD) $(git log -1 --pretty=%s)"
+            echo "- 时间：$(date -u '+%Y-%m-%d %H:%M:%SZ')"
+            echo "- Node：$(node --version) / npm：$(npm --version)"
+            echo ""
+            echo '```'
+          } > ci-logs/last-failure.txt
+          if [ -f ci-failure.log ]; then cat ci-failure.log >> ci-logs/last-failure.txt; else echo "(没有捕获到日志，可能是前置步骤失败)" >> ci-logs/last-failure.txt; fi
+          echo '```' >> ci-logs/last-failure.txt
+          git config user.name "ci-log-bot"
+          git config user.email "ci-log-bot@users.noreply.github.com"
+          git add ci-logs/last-failure.txt
+          git commit -m "ci: 记录失败日志 [skip ci]" || echo "无变化，不提交"
+          git push || echo "推送失败（可能无权限或分支保护）"
