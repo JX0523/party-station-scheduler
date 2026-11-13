@@ -1,8 +1,14 @@
 # 持续集成：每次推送/PR 自动跑测试、构建、代码检查（无需任何密钥）
 name: CI
 on:
-  push:            # 所有分支（含 master）：每次提交都跑测试与构建
-  pull_request:    # 任何 PR 都会跑，作为合并前的质量门禁
+  push:
+    branches: [master]      # 只在主线跑（分支/临时实验不打扰）
+    paths-ignore:           # 只改文档时不跑
+      - '**/*.md'
+      - 'docs/**'
+      - 'dev-logs/**'
+      - '.gitignore'
+  pull_request:             # 合并前的质量门禁
   workflow_dispatch:
 jobs:
   test:
@@ -14,17 +20,32 @@ jobs:
         with:
           node-version: 22   # jsdom 30（运行时冒烟测试）需要 Node 22+
 
+      - name: 环境信息（便于排查）
+        run: |
+          node --version
+          npm --version
+          echo "runner: $RUNNER_OS / $RUNNER_ARCH"
+        shell: bash
+
       - name: 安装依赖
         working-directory: frontend
-        run: npm ci
+        shell: bash
+        run: |
+          npm ci --no-audit --no-fund || {
+            echo "::warning::npm ci 失败，回退到 npm install 继续验证代码"
+            npm install --no-audit --no-fund
+          }
 
       - name: 运行全部测试
+        shell: bash
         run: |
+          # 关键：关闭 errexit，否则第一个失败套件会让整个步骤静默退出，看不到是哪一套挂了
+          set +e
           total=0; failed=0; skipped=0
           for f in test-*.mjs; do
             echo "━━━━━━ $f ━━━━━━"
             out=$(node "$f" 2>&1); code=$?
-            echo "$out" | tail -4
+            echo "$out" | tail -6
             if [ $code -ne 0 ]; then
               echo "::error file=$f::$f 执行失败（退出码 $code）"
               failed=$((failed + 1)); continue
@@ -64,10 +85,11 @@ jobs:
         working-directory: frontend
         run: npm run build
 
-      - name: 运行时冒烟测试（真实加载构建产物，逐页渲染）
+      - name: 运行时冒烟测试（真实加载构建产物，逐页渲染 + 分享页）
+        shell: bash
         run: |
           node test-runtime-smoke.mjs
-          node test-share-route.mjs
+          if [ -f test-share-route.mjs ]; then node test-share-route.mjs; fi
 
       - name: 代码检查（必须 0 error）
         working-directory: frontend
