@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useState, useEffect, createContext } from 'react'
 import { supabase } from './lib/supabase.js'
 import Layout from './components/Layout.jsx'
@@ -10,6 +10,7 @@ import SlotConfig from './pages/SlotConfig.jsx'
 import Scheduling from './pages/Scheduling.jsx'
 import Stats from './pages/Stats.jsx'
 import SemesterConfig from './pages/SemesterConfig.jsx'
+import SharedSchedule from './pages/SharedSchedule.jsx'
 
 // 说明：AuthContext 与 App 组件放在同一文件（便于理解整体结构）；
 // 这会让 Vite 的 Fast Refresh 对整个文件做整页刷新，属于可接受的取舍。
@@ -19,6 +20,7 @@ export const AuthContext = createContext(null)
 function App() {
   const [session, setSession] = useState(null)
   const [loading, setLoading] = useState(true)
+  const location = useLocation()
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -32,6 +34,16 @@ function App() {
 
     return () => subscription.unsubscribe()
   }, [])
+
+  // 只读分享页：免登录访问，必须在登录墙之前判断
+  if (location.pathname.startsWith('/share/')) {
+    return (
+      <Routes>
+        <Route path="/share/:token" element={<SharedSchedule />} />
+        <Route path="*" element={<SharedSchedule />} />
+      </Routes>
+    )
+  }
 
   if (loading) {
     return (
