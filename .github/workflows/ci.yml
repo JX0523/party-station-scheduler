@@ -91,6 +91,7 @@ jobs:
           node test-runtime-smoke.mjs
           if [ -f test-share-route.mjs ]; then node test-share-route.mjs; fi
           if [ -f test-scheduling-ui.mjs ]; then node test-scheduling-ui.mjs; fi
+          if [ -f test-holiday-ui.mjs ]; then node test-holiday-ui.mjs; fi
 
       - name: 代码检查（必须 0 error）
         working-directory: frontend
