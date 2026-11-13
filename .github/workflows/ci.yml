@@ -3,8 +3,7 @@ name: CI
 on:
   push:
     branches: [master]      # 只在主线跑（分支/临时实验不打扰）
-    paths-ignore:           # 只改文档时不跑
-      - '**/*.md'
+    paths-ignore:           # 纯日志/记录目录不跑（注意：改 .md 也要跑，因为要查“文档与代码是否一致”）
       - 'docs/**'
       - 'dev-logs/**'
       - 'ci-logs/**'
@@ -41,6 +40,19 @@ jobs:
             echo "::warning::npm ci 失败，回退到 npm install 继续验证代码"
             npm install --no-audit --no-fund 2>&1 | tee -a ../../ci-failure.log
           }
+
+      - name: 文档与代码一致性
+        shell: bash
+        run: |
+          # 检查文档里的数字/公式是否与代码一致（401 行、965/24、配额公式、四道闸、有效期选项）
+          set +e
+          out=$(node tools/check-docs.mjs 2>&1); code=$?
+          echo "$out"
+          if [ $code -ne 0 ]; then
+            { echo ""; echo "==================== 文档与代码一致性检查失败 ===================="; echo "$out"; } >> ci-failure.log
+            echo "::error file=tools/check-docs.mjs::文档与代码不一致（详见输出或 ci-logs/last-failure.txt）"
+          fi
+          exit $code
 
       - name: 运行全部测试
         shell: bash
