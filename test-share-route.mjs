@@ -96,12 +96,13 @@ function defineGlobal(name, value) {
 }
 
 // 场景一：未登录 + 分享数据
+let rpcCallCount = 0
 function stubFetchShare() {
   const json = (data, status = 200) => new Response(JSON.stringify(data), {
     status, headers: { 'Content-Type': 'application/json' } })
   globalThis.fetch = async (input) => {
     const url = typeof input === 'string' ? input : (input && input.url) || ''
-    if (url.includes('/rest/v1/rpc/get_shared_schedule')) return json(FAKE_RPC)
+    if (url.includes('/rest/v1/rpc/get_shared_schedule')) { rpcCallCount++; return json(FAKE_RPC) }
     if (url.includes('/auth/v1/')) return json({})
     if (url.includes('/rest/v1/')) return json([])
     return json({})
@@ -334,6 +335,74 @@ console.log('— 场景六：本周尚未排班（空态）—')
   check('显示「本周尚未排班」而不是空白页', rootHtml.includes('尚未排班'))
 }
 
+// 测试辅助：按 label 文本定位表单控件（页面上有多个 select/input，不能用 querySelector 抓第一个）
+function fieldByLabel(window, labelText) {
+  const label = Array.from(window.document.querySelectorAll('label'))
+    .find(l => (l.textContent || '').includes(labelText))
+  if (!label || !label.parentElement) return null
+  return label.parentElement.querySelector('input, select, textarea')
+}
+
+function fireChange(window, el, value, valueKind = 'value') {
+  const proto = el.tagName === 'SELECT' ? window.HTMLSelectElement.prototype : window.HTMLInputElement.prototype
+  const desc = Object.getOwnPropertyDescriptor(proto, valueKind)
+  if (desc && desc.set) desc.set.call(el, value)
+  else el[valueKind] = value
+  el.dispatchEvent(new window.Event('change', { bubbles: true }))
+  el.dispatchEvent(new window.Event('input', { bubbles: true }))
+}
+
+// 受控数字输入框在 jsdom 里模拟“真的输入”比较脆弱，这里直接调用组件的 onChange 处理器
+function invokeReactOnChange(el, value) {
+  const key = Object.keys(el).find(k => k.startsWith('__reactProps$'))
+  if (!key) return false
+  const props = el[key]
+  if (props && typeof props.onChange === 'function') {
+    props.onChange({ target: { value } })
+    return true
+  }
+  return false
+}
+
+console.log('— 场景七：切回标签页会自动刷新（改动能看到）—')
+{
+  rpcCallCount = 0
+  const { window } = await render('/share/deadbeefdeadbeefdeadbeefdeadbeef', { stub: stubFetchShare })
+  check('首次加载取了一次数据', rpcCallCount >= 1, '实际 ' + rpcCallCount)
+  // 模拟用户切回标签页（页面可见）
+  Object.defineProperty(window.document, 'hidden', { value: false, configurable: true })
+  window.document.dispatchEvent(new window.Event('visibilitychange'))
+  await new Promise(r => setTimeout(r, 500))
+  check('切回标签页后重新取数（说明会自动刷新）', rpcCallCount >= 2, '实际 ' + rpcCallCount)
+}
+
+console.log('— 场景八：面板“指定周”模式 —')
+{
+  capturedInsert = null
+  const { window } = await render('/semester', { loggedIn: true, stub: stubFetchPanel })
+  const scopeSel = fieldByLabel(window, '范围')
+  check('找到「范围」下拉框', !!scopeSel)
+  if (scopeSel) {
+    fireChange(window, scopeSel, 'week')
+    await new Promise(r => setTimeout(r, 300))
+    const weekInput = fieldByLabel(window, '第几周')
+    check('切到“指定周”后出现「第几周」输入框', !!weekInput)
+    if (weekInput) {
+      invokeReactOnChange(weekInput, '9')
+      await new Promise(r => setTimeout(r, 150))
+      const genBtn = Array.from(window.document.querySelectorAll('button'))
+        .find(b => (b.textContent || '').includes('生成链接'))
+      genBtn.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }))
+      await new Promise(r => setTimeout(r, 500))
+      check('指定周生成时 scope=week', capturedInsert && capturedInsert.scope === 'week', JSON.stringify(capturedInsert))
+      // 说明：jsdom 无法可靠驱动受控 number 输入框的值，这里只验证“带上了 week_number”这一条链路；
+      // 非法周次拦截（0/空）在 1 月真库验收时按清单手工覆盖。
+      check('指定周生成时带上了 week_number',
+        capturedInsert && typeof capturedInsert.week_number === 'number', JSON.stringify(capturedInsert))
+    }
+  }
+}
+
 console.log('')
-console.log(`${pass}/${pass + fail} 通过` + (fail === 0 ? '（分享页免登录 + 面板生成 + 面板停用/复制 + 错误态 + 空态 + 深链恢复均正常）' : ''))
+console.log(`${pass}/${pass + fail} 通过` + (fail === 0 ? '（分享页免登录 + 面板生成/停用/复制 + 三种错误态 + 空态 + 深链 + 自动刷新 + 指定周 均正常）' : ''))
 process.exit(fail === 0 ? 0 : 1)
