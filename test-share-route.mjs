@@ -127,7 +127,7 @@ function stubFetchPanel() {
   }
 }
 
-async function render(pathname, { loggedIn = false, stub = stubFetchShare } = {}) {
+async function render(pathname, { loggedIn = false, stub = stubFetchShare, redirect = null } = {}) {
   const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', {
     url: 'https://example.com' + pathname,
     pretendToBeVisual: true,
@@ -151,6 +151,10 @@ async function render(pathname, { loggedIn = false, stub = stubFetchShare } = {}
   globalThis.cancelAnimationFrame = id => clearTimeout(id)
   if (loggedIn) {
     window.localStorage.setItem(`sb-${PROJECT_REF}-auth-token`, JSON.stringify(makeSession()))
+  }
+  // 模拟 GitHub Pages 的 404.html：把原路径存进 sessionStorage.redirect 再跳回首页
+  if (redirect) {
+    window.sessionStorage.setItem('redirect', redirect)
   }
   stub()
   await import(pathToFileURL(BUNDLE).href + '?t=' + Date.now())
@@ -196,6 +200,20 @@ console.log('— 场景二：已登录在学期设置页生成链接 —')
   }
 }
 
+console.log('— 场景三：GitHub Pages 深链恢复（404 跳回首页后应回到分享页）—')
+{
+  // 首页地址 + sessionStorage 里记着原分享路径，模拟 Pages 的 404 重定向行为
+  const { window, rootHtml } = await render('/', {
+    stub: stubFetchShare,
+    redirect: '/share/deadbeefdeadbeefdeadbeefdeadbeef'
+  })
+  check('地址被还原为分享路径', window.location.pathname === '/share/deadbeefdeadbeefdeadbeefdeadbeef',
+    '实际: ' + window.location.pathname)
+  check('还原后渲染的是分享页（不是登录页/首页）',
+    (rootHtml.includes('值班安排') || rootHtml.includes('只读视图')) && !rootHtml.includes('登录</button>'))
+  check('sessionStorage 里的 redirect 已被清空', !window.sessionStorage.getItem('redirect'))
+}
+
 console.log('')
-console.log(`${pass}/${pass + fail} 通过` + (fail === 0 ? '（分享页免登录 + 面板生成链路均正常）' : ''))
+console.log(`${pass}/${pass + fail} 通过` + (fail === 0 ? '（分享页免登录 + 面板生成链路 + 深链恢复均正常）' : ''))
 process.exit(fail === 0 ? 0 : 1)
