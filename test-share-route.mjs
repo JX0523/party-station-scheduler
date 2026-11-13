@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 只读分享功能 运行时冒烟测试（test-share-route.mjs）
  *
  * 场景一：未登录访问 /share/:token —— 不能被登录墙拦下，且能渲染姓名/请假/替补
@@ -212,7 +212,26 @@ function stubFetchPanelMissingTable() {
   }
 }
 
-async function render(pathname, { loggedIn = false, stub = stubFetchShare, redirect = null } = {}) {
+
+// 场景十二/十三：删除（确认/取消）——捕获 DELETE 请求
+let capturedDelete = null
+function stubFetchPanelDeletable(expired = false) {
+  const json = (data, status = 200) => new Response(JSON.stringify(data), {
+    status, headers: { 'Content-Type': 'application/json' } })
+  const row = { ...EXISTING_ROW, expires_at: expired ? new Date(Date.now() - 86400000).toISOString() : null }
+  globalThis.fetch = async (input, init = {}) => {
+    const url = typeof input === 'string' ? input : (input && input.url) || ''
+    const method = (init.method || 'GET').toUpperCase()
+    if (url.includes('/auth/v1/user')) return json(makeSession().user)
+    if (url.includes('/auth/v1/')) return json({})
+    if (url.includes('/rest/v1/share_links') && method === 'DELETE') { capturedDelete = url; return json([{}], 200) }
+    if (url.includes('/rest/v1/share_links')) return json([row])
+    if (url.includes('/rest/v1/')) return json([])
+    return json({})
+  }
+}
+
+async function render(pathname, { loggedIn = false, stub = stubFetchShare, redirect = null, confirmResult = false } = {}) {
   // 捕获运行期的 console.error（React 报错/警告都会走这里，等于“页面有没有暗病”的证据）
   const consoleErrors = []
   const originError = console.error
@@ -245,6 +264,9 @@ async function render(pathname, { loggedIn = false, stub = stubFetchShare, redir
   if (redirect) {
     window.sessionStorage.setItem('redirect', redirect)
   }
+  // 覆盖 window.confirm（jsdom 的 confirm 未实现且会往 console 写错误）
+  window.confirm = () => confirmResult
+  defineGlobal('confirm', () => confirmResult)
   stub()
   await import(pathToFileURL(BUNDLE).href + '?t=' + Date.now())
   await new Promise(r => setTimeout(r, 700))
@@ -442,6 +464,46 @@ console.log('— 场景十一：正常渲染时不应出现任何运行时错误
   check('分享页渲染无 console.error（无 React 报错/警告）',
     consoleErrors.length === 0, consoleErrors.slice(0, 2).join(' | '))
   check('页面内容确实渲染出来了', rootHtml.includes('张三'))
+}
+
+console.log('— 场景十二：删除要二次确认，取消则不发请求 —')
+{
+  // 12.1 取消
+  capturedDelete = null
+  {
+    const { window } = await render('/semester', { loggedIn: true, stub: () => stubFetchPanelDeletable(false), confirmResult: false })
+    const delBtn = Array.from(window.document.querySelectorAll('button')).find(b => (b.textContent || '').trim() === '删除')
+    check('找到“删除”按钮', !!delBtn)
+    if (delBtn) {
+      delBtn.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }))
+      await new Promise(r => setTimeout(r, 400))
+      check('取消确认时不发删除请求', capturedDelete === null)
+    }
+  }
+  // 12.2 确认
+  capturedDelete = null
+  {
+    const { window } = await render('/semester', { loggedIn: true, stub: () => stubFetchPanelDeletable(false), confirmResult: true })
+    const delBtn = Array.from(window.document.querySelectorAll('button')).find(b => (b.textContent || '').trim() === '删除')
+    if (delBtn) {
+      delBtn.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }))
+      await new Promise(r => setTimeout(r, 500))
+      check('确认后发出删除请求', capturedDelete !== null)
+      check('删除请求带上了该行 id', capturedDelete && capturedDelete.includes(EXISTING_ROW.id))
+    }
+  }
+}
+
+console.log('— 场景十三：过期链接在列表里显示“已过期” —')
+{
+  const { rootHtml } = await render('/semester', { loggedIn: true, stub: () => stubFetchPanelDeletable(true) })
+  check('过期链接显示“已过期”', rootHtml.includes('已过期'))
+}
+
+console.log('— 场景十四：管理面板渲染也不应有 console 错误 —')
+{
+  const { consoleErrors } = await render('/semester', { loggedIn: true, stub: stubFetchPanelWithRow })
+  check('面板渲染无 console.error', consoleErrors.length === 0, consoleErrors.slice(0, 2).join(' | '))
 }
 
 console.log('')
