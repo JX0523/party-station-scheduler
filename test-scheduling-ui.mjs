@@ -224,6 +224,68 @@ console.log('— S4：请假 → 选替补（最关键的业务操作）—')
   }
 }
 
+console.log('— S5：请假写入失败 → 必须报错，且不能继续弹替补框 —')
+{
+  const json = (d, s = 200) => new Response(JSON.stringify(d), { status: s, headers: { 'Content-Type': 'application/json' } })
+  const rowNormal = {
+    id: 'a1', week_number: 1, day_of_week: 1, slot: '上午', member_id: 'm1',
+    status: '正常', is_emergency: false, leave_next_week: false, members: { name: '张三', role: '部员' }
+  }
+  let patchAttempted = false
+  globalThis.fetch = async (input, init = {}) => {
+    const url = typeof input === 'string' ? input : (input && input.url) || ''
+    const method = (init.method || 'GET').toUpperCase()
+    if (url.includes('/auth/v1/user')) return json(makeSession().user)
+    if (url.includes('/auth/v1/')) return json({})
+    if (url.includes('/rest/v1/assignments') && method === 'PATCH') {
+      patchAttempted = true
+      return json({ message: 'permission denied for table assignments', code: '42501' }, 403)
+    }
+    if (url.includes('/rest/v1/assignments')) return json([rowNormal])
+    if (url.includes('/rest/v1/semester_config')) return json(SEM)
+    if (url.includes('/rest/v1/slot_config')) return json(SLOTS)
+    if (url.includes('/rest/v1/course_schedules')) return json([])
+    if (url.includes('/rest/v1/members')) return json([{ id: 'm1', name: '张三', role: '部员', active: true }])
+    if (url.includes('/rest/v1/')) return json([])
+    return json({})
+  }
+  const dom2 = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', {
+    url: 'https://example.com/scheduling', pretendToBeVisual: true,
+  })
+  const w2 = dom2.window
+  defineGlobal('BroadcastChannel', FakeBroadcastChannel)
+  defineGlobal('window', w2)
+  defineGlobal('document', w2.document)
+  defineGlobal('navigator', w2.navigator)
+  defineGlobal('location', w2.location)
+  defineGlobal('history', w2.history)
+  defineGlobal('localStorage', w2.localStorage)
+  defineGlobal('sessionStorage', w2.sessionStorage)
+  defineGlobal('HTMLElement', w2.HTMLElement)
+  defineGlobal('Node', w2.Node)
+  defineGlobal('Event', w2.Event)
+  defineGlobal('CustomEvent', w2.CustomEvent)
+  defineGlobal('MutationObserver', w2.MutationObserver)
+  defineGlobal('getComputedStyle', w2.getComputedStyle.bind(w2))
+  defineGlobal('confirm', () => true)
+  globalThis.requestAnimationFrame = cb => setTimeout(() => cb(Date.now()), 0)
+  globalThis.cancelAnimationFrame = id => clearTimeout(id)
+  w2.localStorage.setItem(`sb-${PROJECT_REF}-auth-token`, JSON.stringify(makeSession()))
+  await import(pathToFileURL(BUNDLE).href + '?t=' + Date.now())
+  await new Promise(r => setTimeout(r, 900))
+
+  const leaveBtn = Array.from(w2.document.querySelectorAll('button')).find(b => (b.textContent || '').trim() === '请假')
+  check('找到「请假」按钮', !!leaveBtn)
+  if (leaveBtn) {
+    leaveBtn.dispatchEvent(new w2.MouseEvent('click', { bubbles: true, cancelable: true }))
+    await new Promise(r => setTimeout(r, 700))
+    const html = w2.document.getElementById('root')?.innerHTML || ''
+    check('确实尝试写入请假', patchAttempted)
+    check('失败时提示「请假失败」', html.includes('请假失败'), html.slice(0, 160))
+    check('失败时不弹替补选择框', !html.includes('选择替补'))
+  }
+}
+
 console.log('')
-console.log(`${pass}/${pass + fail} 通过` + (fail === 0 ? '（排班页显示/请假/缺人/按钮规则/请假→替补链路/无报错 均正常）' : ''))
+console.log(`${pass}/${pass + fail} 通过` + (fail === 0 ? '（排班页：显示/请假/缺人/按钮规则/请假→替补/写入失败即报错/无报错 均正常）' : ''))
 process.exit(fail === 0 ? 0 : 1)
