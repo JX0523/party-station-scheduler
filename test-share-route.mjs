@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 只读分享功能 运行时冒烟测试（test-share-route.mjs）
  *
  * 场景一：未登录访问 /share/:token —— 不能被登录墙拦下，且能渲染姓名/请假/替补
@@ -43,15 +43,15 @@ try {
 function readProjectRef() {
   try {
     const env = fs.readFileSync(path.join(ROOT, 'frontend', '.env'), 'utf8')
-    const m = env.match(/VITE_SUPABASE_URL\s*=\s*https:\/\/([a-z0-9]+)\.supabase\.co/i)
+    const m = env.match(/VITE_SUPABASE_URL\s*=\s*https:\/\/([a-z0-9-]+)\.supabase\.co/i)
     if (m) return m[1]
   } catch { /* 忽略 */ }
   try {
     const code = fs.readFileSync(BUNDLE, 'utf8')
-    const m = code.match(/https:\/\/([a-z0-9]{15,})\.supabase\.co/i)
+    const m = code.match(/https:\/\/([a-z0-9-]{15,})\.supabase\.co/i)
     if (m) return m[1]
   } catch { /* 忽略 */ }
-  return 'demo-project-ref'
+  return 'demo-project'
 }
 
 const PROJECT_REF = readProjectRef()

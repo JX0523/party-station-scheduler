@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 首页「自动生成排班」运行时测试（test-dashboard-ui.mjs）
  *
  * 为什么测：打开首页时若本周没排班，系统会**自动跑算法并写入数据库**。
@@ -32,10 +32,10 @@ try { ({ JSDOM } = await import(pathToFileURL(JSDOM_PATH).href)) } catch { conso
 function readProjectRef() {
   try {
     const env = fs.readFileSync(path.join(ROOT, 'frontend', '.env'), 'utf8')
-    const m = env.match(/VITE_SUPABASE_URL\s*=\s*https:\/\/([a-z0-9]+)\.supabase\.co/i)
+    const m = env.match(/VITE_SUPABASE_URL\s*=\s*https:\/\/([a-z0-9-]+)\.supabase\.co/i)
     if (m) return m[1]
   } catch { /* 忽略 */ }
-  return 'demo-project-ref'
+  return 'demo-project'
 }
 const PROJECT_REF = readProjectRef()
 

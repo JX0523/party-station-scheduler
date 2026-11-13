@@ -30,10 +30,10 @@ try { ({ JSDOM } = await import(pathToFileURL(JSDOM_PATH).href)) } catch { conso
 function readProjectRef() {
   try {
     const env = fs.readFileSync(path.join(ROOT, 'frontend', '.env'), 'utf8')
-    const m = env.match(/VITE_SUPABASE_URL\s+=\s*https:\/\/([a-z0-9]+)\.supabase\.co/i) || env.match(/VITE_SUPABASE_URL\s*=\s*https:\/\/([a-z0-9]+)\.supabase\.co/i)
+    const m = env.match(/VITE_SUPABASE_URL\s+=\s*https:\/\/([a-z0-9-]+)\.supabase\.co/i) || env.match(/VITE_SUPABASE_URL\s*=\s*https:\/\/([a-z0-9-]+)\.supabase\.co/i)
     if (m) return m[1]
   } catch { /* 忽略 */ }
-  return 'demo-project-ref'
+  return 'demo-project'
 }
 const PROJECT_REF = readProjectRef()
 
