@@ -1,4 +1,4 @@
-# 党员工作站排班系统
+﻿# 党员工作站排班系统
 
 [![CI](https://github.com/JX0523/party-station-scheduler/actions/workflows/ci.yml/badge.svg)](https://github.com/JX0523/party-station-scheduler/actions/workflows/ci.yml)
 [![Deploy](https://github.com/JX0523/party-station-scheduler/actions/workflows/deploy.yml/badge.svg)](https://github.com/JX0523/party-station-scheduler/actions/workflows/deploy.yml)
@@ -125,7 +125,7 @@ GitHub Actions 部署时通过仓库 Secrets 注入：`VITE_SUPABASE_URL`、`VIT
 | test-fixed-behaviors.mjs | 11 | 关键修复回归 |
 | test-full-semester.mjs | 14 | 整学期模拟 |
 | test-phase1-fix.mjs | 34 | 课表冲突与调休 |
-| test-fuzz-invariants.mjs | 400 | **随机模糊测试**：400 个随机场景 × 10 条不变量（可复现种子） |
+| test-fuzz-invariants.mjs | 400 | **随机模糊测试**：400 个随机场景 × 11 条不变量（可复现种子） |
 | test-schema-grants.mjs | 42 | **数据库授权合规**：每表 GRANT/RLS/策略、建表迁移必须带 GRANT |
 | test-runtime-smoke.mjs | 16 | **运行时冒烟**：加载构建产物，逐页真实渲染（7 个页面）+ 未登录场景 |
 | **合计** | **785** | 全部通过（CI 每次提交都会跑） |
