@@ -16,7 +16,7 @@ CREATE TEMP TABLE IF NOT EXISTS _share_test (
   name   text,
   result text,
   detail text
-) ON COMMIT DROP;
+);
 TRUNCATE _share_test;
 
 DO $$
