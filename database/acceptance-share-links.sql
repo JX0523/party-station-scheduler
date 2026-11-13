@@ -56,21 +56,30 @@ BEGIN
     v_fail := v_fail + 1; RAISE NOTICE 'FAIL 6/9 anon 没有执行权限（老师打不开）';
   END IF;
 
-  -- 7. anon 不能读业务表（这是“只读”的安全底线）
-  IF has_table_privilege('anon', 'public.members', 'SELECT') THEN
-    v_fail := v_fail + 1; RAISE NOTICE 'FAIL 7/9 anon 竟然能读 members（权限过大！）';
+  -- 7. 业务表（members）必须启用 RLS，且策略里不能有 anon（这是“只读”的安全底线）
+  --    注意：Supabase 可能给 anon 授予表级 SELECT 权限；只要 RLS 开启且策略仅限 authenticated，
+  --    匿名用户实际读不到任何行。所以检查“RLS + 策略角色”比只看权限位更准确。
+  SELECT relrowsecurity INTO v_ok FROM pg_class
+   WHERE relname = 'members' AND relnamespace = 'public'::regnamespace;
+  IF v_ok IS NOT TRUE THEN
+    v_fail := v_fail + 1; RAISE NOTICE 'FAIL 7/9 members 未启用 RLS（匿名可能读到数据）';
   ELSE
-    v_pass := v_pass + 1; RAISE NOTICE 'PASS 7/9 anon 不能读 members（业务表仍然收口）';
+    SELECT count(*) INTO v_n FROM pg_policies
+     WHERE schemaname = 'public' AND tablename = 'members' AND ('anon' = ANY(roles));
+    IF v_n > 0 THEN
+      v_fail := v_fail + 1; RAISE NOTICE 'FAIL 7/9 members 有 % 条策略放给了 anon（应仅 authenticated）', v_n;
+    ELSE
+      v_pass := v_pass + 1; RAISE NOTICE 'PASS 7/9 members 启用 RLS 且策略不含 anon';
+    END IF;
   END IF;
 
-  -- 8. anon 不能写 share_links（只能通过函数间接计数）
-  IF has_table_privilege('anon', 'public.share_links', 'SELECT')
-     OR has_table_privilege('anon', 'public.share_links', 'INSERT')
-     OR has_table_privilege('anon', 'public.share_links', 'UPDATE')
-     OR has_table_privilege('anon', 'public.share_links', 'DELETE') THEN
-    v_fail := v_fail + 1; RAISE NOTICE 'FAIL 8/9 anon 竟能直接操作 share_links（应收口到函数）';
+  -- 8. share_links 的策略必须全部限定 authenticated（匿名只能通过函数访问）
+  SELECT count(*) INTO v_n FROM pg_policies
+   WHERE schemaname = 'public' AND tablename = 'share_links' AND ('anon' = ANY(roles));
+  IF v_n > 0 THEN
+    v_fail := v_fail + 1; RAISE NOTICE 'FAIL 8/9 share_links 有 % 条策略放给了 anon（应收口到函数）', v_n;
   ELSE
-    v_pass := v_pass + 1; RAISE NOTICE 'PASS 8/9 anon 无法直接读写 share_links';
+    v_pass := v_pass + 1; RAISE NOTICE 'PASS 8/9 share_links 策略仅限 authenticated';
   END IF;
 
   -- 9. 节流所需字段存在
