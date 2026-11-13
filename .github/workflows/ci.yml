@@ -14,17 +14,27 @@ jobs:
         with:
           node-version: 22   # jsdom 30（运行时冒烟测试）需要 Node 22+
 
+      - name: 环境信息（便于排查）
+        run: |
+          node --version
+          npm --version
+          echo "runner: $RUNNER_OS / $RUNNER_ARCH"
+        shell: bash
+
       - name: 安装依赖
         working-directory: frontend
-        run: npm ci
+        run: npm ci --no-audit --no-fund
 
       - name: 运行全部测试
+        shell: bash
         run: |
+          # 关键：关闭 errexit，否则第一个失败套件会让整个步骤静默退出，看不到是哪一套挂了
+          set +e
           total=0; failed=0; skipped=0
           for f in test-*.mjs; do
             echo "━━━━━━ $f ━━━━━━"
             out=$(node "$f" 2>&1); code=$?
-            echo "$out" | tail -4
+            echo "$out" | tail -6
             if [ $code -ne 0 ]; then
               echo "::error file=$f::$f 执行失败（退出码 $code）"
               failed=$((failed + 1)); continue
