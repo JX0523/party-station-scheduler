@@ -125,5 +125,5 @@ check('渲染出「王五」作为替补', html.includes('王五'))
 check('显示周次信息（第 8 周）', html.includes('第 8 周') || html.includes('8 周'))
 
 console.log('')
-console.log(`结果：通过 ${pass} 项，失败 ${fail} 项`)
+console.log(`${pass}/${pass + fail} 通过` + (fail === 0 ? '（分享页：未被登录墙拦住，姓名/请假/替补均渲染正常）' : ''))
 process.exit(fail === 0 ? 0 : 1)

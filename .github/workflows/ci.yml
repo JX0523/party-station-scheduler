@@ -65,7 +65,9 @@ jobs:
         run: npm run build
 
       - name: 运行时冒烟测试（真实加载构建产物，逐页渲染）
-        run: node test-runtime-smoke.mjs
+        run: |
+          node test-runtime-smoke.mjs
+          node test-share-route.mjs
 
       - name: 代码检查（必须 0 error）
         working-directory: frontend
