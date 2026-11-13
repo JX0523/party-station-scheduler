@@ -47,8 +47,9 @@ export default function SlotConfig() {
         })
       })
     }
-    await supabase.from('slot_config').upsert(upserts, { onConflict: 'day_of_week,slot' })
+    const { error } = await supabase.from('slot_config').upsert(upserts, { onConflict: 'day_of_week,slot' })
     setSaving(false)
+    if (error) return showToast('保存失败：' + error.message, 'error')
     showToast('时段配置保存成功', 'success')
     loadConfig()
   }

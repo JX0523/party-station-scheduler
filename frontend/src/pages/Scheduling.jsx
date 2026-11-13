@@ -79,11 +79,10 @@ export default function Scheduling() {
     const { data: existing } = await supabase.from('slot_config')
       .select('id').eq('day_of_week', day).eq('slot', slot).maybeSingle()
 
-    if (existing) {
-      await supabase.from('slot_config').update({ required_count: val }).eq('id', existing.id)
-    } else {
-      await supabase.from('slot_config').insert({ day_of_week: day, slot, required_count: val })
-    }
+    const { error: saveErr } = existing
+      ? await supabase.from('slot_config').update({ required_count: val }).eq('id', existing.id)
+      : await supabase.from('slot_config').insert({ day_of_week: day, slot, required_count: val })
+    if (saveErr) return showToast('调整失败：' + saveErr.message, 'error')
 
     await loadSlotConfig()
     setEditingSlot(null)

@@ -54,12 +54,11 @@ export default function CourseSchedule() {
     const existing = await supabase.from('course_schedules')
       .select('id').eq('member_id', selectedMember.id).eq('week_type', weekType).maybeSingle()
     const data = { member_id: selectedMember.id, week_type: weekType, ...schedule }
-    if (existing.data) {
-      await supabase.from('course_schedules').update(data).eq('id', existing.data.id)
-    } else {
-      await supabase.from('course_schedules').insert(data)
-    }
+    const { error } = existing.data
+      ? await supabase.from('course_schedules').update(data).eq('id', existing.data.id)
+      : await supabase.from('course_schedules').insert(data)
     setSaving(false)
+    if (error) return showToast('保存失败：' + error.message, 'error')
     showToast('课表保存成功', 'success')
   }
 
@@ -68,11 +67,10 @@ export default function CourseSchedule() {
     const existing = await supabase.from('course_schedules')
       .select('id').eq('member_id', selectedMember.id).eq('week_type', otherType).maybeSingle()
     const data = { member_id: selectedMember.id, week_type: otherType, ...schedule }
-    if (existing.data) {
-      await supabase.from('course_schedules').update(data).eq('id', existing.data.id)
-    } else {
-      await supabase.from('course_schedules').insert(data)
-    }
+    const { error } = existing.data
+      ? await supabase.from('course_schedules').update(data).eq('id', existing.data.id)
+      : await supabase.from('course_schedules').insert(data)
+    if (error) return showToast('复制失败：' + error.message, 'error')
     showToast(`已复制到${otherType}课表`, 'success')
   }
 
