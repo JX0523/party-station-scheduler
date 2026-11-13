@@ -72,6 +72,19 @@ if (defense) {
   }
 }
 
+// 6) 课表格子数（21 = 7 天 × 3 档）：代码里应有 21 个布尔列；文档若提到“21”则应成对出现
+const courseCols = (algo.match(/\b(mon|tue|wed|thu|fri|sat|sun)_(34|67|89)\b/g) || []).length
+if (courseCols > 0 && courseCols !== 21) add(`课表列数异常：代码里出现 ${courseCols} 个时段字段，应为 21`)
+for (const [name, text] of Object.entries(docs)) {
+  if (/21\s*(个)?\s*格/.test(text) && !/7\s*天\s*×\s*3/.test(text)) {
+    add(`${name}：写“21 格”时要同时说明“7 天 × 3 档”`)
+  }
+}
+
+// 7) 新功能必须在用户手册里有说明
+const manual = docs['使用手册.md'] || ''
+if (manual && !manual.includes('只读分享')) add('使用手册.md：缺少“只读分享”一节（新功能未写进手册）')
+
 // 输出
 if (!problems.length) {
   console.log(`OK 文档与代码一致（算法 ${algoLines} 行，检查 ${DOCS.length} 份文档）`)

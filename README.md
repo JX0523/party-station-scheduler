@@ -158,7 +158,7 @@ GitHub Actions 部署时通过仓库 Secrets 注入：`VITE_SUPABASE_URL`、`VIT
 | test-comprehensive.mjs | 49 | 大规模综合用户场景 |
 | test-config-ui.mjs | 14 | 学期设置必填校验、时段配置 21 条保存 |
 | test-console-clean.mjs | 8 | 全站控制台零错误巡检（8 个路由） |
-| test-course-ui.mjs | 13 | 课表页：单双周分离、21 格保存、复制到另一周 |
+| test-course-ui.mjs | 13 | 课表页：单双周分离、21 格（7 天 × 3 档）保存、复制到另一周 |
 | test-dashboard-ui.mjs | 10 | 首页：本周无排班自动生成、已有排班不覆盖 |
 | test-doc-claims.mjs | 25 | 文档一致性：配额公式、每周上限、放假、紧急模式、调休、源码常量 |
 | test-edge-cases.mjs | 20 | 极端输入、功能叠加、并发边界 |
