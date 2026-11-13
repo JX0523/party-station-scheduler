@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase.js'
 import ShareLinksPanel from '../components/ShareLinksPanel.jsx'
 
@@ -131,7 +131,7 @@ export default function SemesterConfig() {
         </button>
       </div>
 
-      <ShareLinksPanel currentWeek={config.current_week || 1} totalWeeks={config.total_weeks || 20} />
+      <ShareLinksPanel currentWeek={form.current_week || 1} totalWeeks={form.total_weeks || 20} />
     </div>
   )
 }
