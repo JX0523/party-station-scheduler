@@ -241,5 +241,3 @@ export default function DaySelector({ weekNumber, locked, onChange }) {
     </div>
   )
 }
-
-export { DAY_FULL }
