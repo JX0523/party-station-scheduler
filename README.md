@@ -3,7 +3,7 @@
 [![CI](https://github.com/JX0523/party-station-scheduler/actions/workflows/ci.yml/badge.svg)](https://github.com/JX0523/party-station-scheduler/actions/workflows/ci.yml)
 [![Deploy](https://github.com/JX0523/party-station-scheduler/actions/workflows/deploy.yml/badge.svg)](https://github.com/JX0523/party-station-scheduler/actions/workflows/deploy.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-![Tests](https://img.shields.io/badge/tests-948%20passed-brightgreen)
+![Tests](https://img.shields.io/badge/tests-955%20passed-brightgreen)
 
 为大学党员工作站设计的 **Web 排班管理系统**：管理员在浏览器上完成成员管理、课表录入、自动排班、请假替补、**按日期放假**、值班统计等全流程工作，替代手工排班。
 
@@ -41,7 +41,7 @@
 | 数据 | Supabase：PostgreSQL 15、Auth（邮箱密码）、RLS 行级安全 |
 | 导出 | SheetJS (xlsx) |
 | 部署 | GitHub Pages + Netlify，GitHub Actions 自动构建 |
-| 测试 | 单元 + 模糊 + 冒烟 + 授权合规（**948 项检查**：含 400 随机场景、16 项页面真实渲染、42 项 DB 授权检查、13 项分享功能链路） |
+| 测试 | 单元 + 模糊 + 冒烟 + 授权合规（**955 项检查**：含 400 随机场景、16 项页面真实渲染、42 项 DB 授权检查、13 项分享功能链路） |
 
 ## 项目结构
 
@@ -58,7 +58,7 @@
 │   ├── src/pages/  src/components/          # 页面与组件
 │   └── vendor/xlsx-0.20.3.tgz               # 内置修复版依赖（离线可装）
 ├── database/                                # schema.sql + 迁移脚本 + seed-demo.sql（演示数据）
-├── test-*.mjs                               # 23 个测试套件（948 项检查，含界面测试）
+├── test-*.mjs                               # 23 个测试套件（955 项检查，含界面测试）
 ├── tools/                                   # 运维脚本：系统审计 / 数据备份 / 数据恢复
 └── .github/                                 # CI、部署、保活、Issue/PR 模板
 ```
@@ -135,10 +135,10 @@ GitHub Actions 部署时通过仓库 Secrets 注入：`VITE_SUPABASE_URL`、`VIT
 | test-course-ui.mjs | 13 | 课表页：单双周分离、21 格保存、复制到另一周 |
 | test-dashboard-ui.mjs | 10 | 首页：本周无排班自动生成、已有排班不覆盖 |
 | test-config-ui.mjs | 14 | 学期设置必填校验、时段配置 21 条保存 |
-| test-doc-claims.mjs | 18 | 文档公式一致性：部长/主席团配额、每周上限、放假、紧急模式、调休、确定性 |
+| test-doc-claims.mjs | 25 | 文档公式一致性：部长/主席团配额、每周上限、放假、紧急模式、调休、确定性 |
 | test-golden-example.mjs | 11 | 白板手算示例金标准（讲义/速查卡的示例输出必须与代码一致） |
 | test-console-clean.mjs | 8 | 全站控制台零错误巡检（8 个路由） |
-| **合计** | **948** | 全部通过（CI 每次提交都会跑；界面测试需先构建） |
+| **合计** | **955** | 全部通过（CI 每次提交都会跑；界面测试需先构建） |
 
 ## 已知注意点
 

@@ -127,6 +127,25 @@ console.log('— 7. 确定性：同样输入两次跑，结果一致 —')
   check('两次结果完全相同', JSON.stringify(r1.assignments) === JSON.stringify(r2.assignments))
 }
 
+console.log('— 8. 源码常量与文档一致（静态检查）—')
+{
+  const fs = await import('fs')
+  const algo = fs.readFileSync('frontend/src/lib/scheduling-algorithm.js', 'utf8')
+  const share = fs.readFileSync('frontend/src/pages/SharedSchedule.jsx', 'utf8')
+  const mig = fs.readFileSync('database/migration-v8-share-links.sql', 'utf8')
+  const schema = fs.readFileSync('database/schema.sql', 'utf8')
+
+  const algoLines = algo.split('\n').length - (algo.endsWith('\n') ? 1 : 0)
+  check('算法文件是 401 行（文档口径）', algoLines === 401, String(algoLines))
+  check('第一阶段“只试前 3 名候选”（pool.slice(0, 3)）', algo.includes('pool.slice(0, 3)'))
+  check('第一阶段外层最多 5 轮（round < 5）', algo.includes('round < 5'))
+  check('课表是 21 个布尔列（7 天 × 3 档）',
+    (schema.match(/\b(mon|tue|wed|thu|fri|sat|sun)_(34|67|89)\b/g) || []).length === 21)
+  check('分享页每 60 秒自动刷新（60000 毫秒）', share.includes('60000'))
+  check('数据库访问计数按 60 秒节流', mig.includes("interval '60 seconds'"))
+  check('只读函数限制令牌长度 ≤ 64', mig.includes('length(p_token) > 64'))
+}
+
 console.log('')
-console.log(`${pass}/${pass + fail} 通过` + (fail === 0 ? '（文档里的公式与规则均与代码一致）' : ''))
+console.log(`${pass}/${pass + fail} 通过` + (fail === 0 ? '（文档里的公式、规则、常量均与代码一致）' : ''))
 process.exit(fail === 0 ? 0 : 1)
