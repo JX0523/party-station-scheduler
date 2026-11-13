@@ -195,6 +195,23 @@ function stubRpcEmpty() {
   }
 }
 
+
+// 场景十：数据库未初始化时，面板必须明确提示（不能假装“没有链接”）
+function stubFetchPanelMissingTable() {
+  const json = (data, status = 200) => new Response(JSON.stringify(data), {
+    status, headers: { 'Content-Type': 'application/json' } })
+  globalThis.fetch = async (input) => {
+    const url = typeof input === 'string' ? input : (input && input.url) || ''
+    if (url.includes('/auth/v1/user')) return json(makeSession().user)
+    if (url.includes('/auth/v1/')) return json({})
+    if (url.includes('/rest/v1/share_links')) {
+      return json({ message: 'relation "public.share_links" does not exist' }, 404)
+    }
+    if (url.includes('/rest/v1/')) return json([])
+    return json({})
+  }
+}
+
 async function render(pathname, { loggedIn = false, stub = stubFetchShare, redirect = null } = {}) {
   const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', {
     url: 'https://example.com' + pathname,
@@ -401,6 +418,13 @@ console.log('— 场景八：面板“指定周”模式 —')
         capturedInsert && typeof capturedInsert.week_number === 'number', JSON.stringify(capturedInsert))
     }
   }
+}
+
+console.log('— 场景十：数据库未初始化时面板要明确提示 —')
+{
+  const { rootHtml } = await render('/semester', { loggedIn: true, stub: stubFetchPanelMissingTable })
+  check('面板提示“读取分享链接失败”', rootHtml.includes('读取分享链接失败'))
+  check('提示里说明可能是没跑迁移脚本', rootHtml.includes('迁移脚本') || rootHtml.includes('migration-v8'))
 }
 
 console.log('')

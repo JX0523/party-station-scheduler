@@ -23,11 +23,19 @@ export default function ShareLinksPanel({ currentWeek = 1, totalWeeks = 20 }) {
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState(null)
   const [latest, setLatest] = useState('')
+  const [loadError, setLoadError] = useState(null)
 
   const flash = (type, text) => { setMsg({ type, text }); setTimeout(() => setMsg(null), 5000) }
 
   const load = useCallback(async () => {
-    const { data } = await supabase.from('share_links').select('*').order('created_at', { ascending: false })
+    const { data, error } = await supabase.from('share_links').select('*').order('created_at', { ascending: false })
+    if (error) {
+      // 典型情况：迁移脚本还没跑（表不存在）。必须显式告诉管理员，不能假装“没有链接”。
+      setLoadError(error.message || '读取失败')
+      setList([])
+      return
+    }
+    setLoadError(null)
     setList(data || [])
   }, [])
 
@@ -117,6 +125,16 @@ export default function ShareLinksPanel({ currentWeek = 1, totalWeeks = 20 }) {
           {busy ? '生成中…' : '🔗 生成链接'}
         </button>
       </div>
+
+      {loadError && (
+        <div style={{ fontSize: 13, marginBottom: 10, padding: '8px 12px', borderRadius: 6,
+          background: '#fff8e1', color: '#8d6e00', border: '1px solid #ffe082' }}>
+          ⚠️ 读取分享链接失败：{loadError}
+          <div style={{ marginTop: 4, fontSize: 12 }}>
+            常见原因：数据库还没执行迁移脚本（<code>migration-v8-share-links.sql</code>）。执行后刷新本页即可。
+          </div>
+        </div>
+      )}
 
       {msg && (
         <div style={{ fontSize: 13, marginBottom: 10, padding: '8px 12px', borderRadius: 6,
