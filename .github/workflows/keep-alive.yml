@@ -8,6 +8,10 @@ on:
   schedule:
     - cron: '17 3 * * *'  # 每天 UTC 03:17（避开整点高峰，北京时间上午11:17）
   workflow_dispatch:
+  push:                    # 本文件变更时立即触发一次（推送后马上跑，不必等到明天）
+    branches: [master]
+    paths:
+      - '.github/workflows/keep-alive.yml'
 
 jobs:
   ping:
@@ -63,3 +67,52 @@ jobs:
             -o /dev/null)
 
           echo "✅ Cleanup done (HTTP ${DELETE_CODE})"
+
+
+  ping-sandbox:
+    name: 保活沙盒演示库（party-station-demo）
+    runs-on: ubuntu-latest
+    steps:
+      - name: INSERT heartbeat into sandbox keep_alive_pings
+        run: |
+          set -euo pipefail
+          # 沙盒演示库：优先用 Secrets；未配置时退回仓库内默认值（anon key 仅用于演示库，风险低）
+          SANDBOX_URL="${SANDBOX_SUPABASE_URL:-https://kfcfudtbckykhgwxfwkv.supabase.co}"
+          SANDBOX_KEY="${SANDBOX_SUPABASE_ANON_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtmY2Z1ZHRiY2t5a2hnd3hmd2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ0MDM0MzksImV4cCI6MjEwOTk3OTQzOX0.MT2ZcuXwzKK1t_KOeSYcvSkNQXXNk4VNyzCT4GcOYR4}"
+
+          SUPA_URL="${SANDBOX_URL%/}"
+
+          # 1) INSERT 心跳 — 真实写操作，重置沙盒的不活跃计时器
+          echo "→ INSERT heartbeat into sandbox keep_alive_pings ..."
+          INSERT_CODE=$(curl -w "%{http_code}" \
+            --max-time 30 \
+            --retry 2 \
+            -X POST \
+            "${SUPA_URL}/rest/v1/keep_alive_pings" \
+            -H "apikey: ${SANDBOX_KEY}" \
+            -H "Authorization: Bearer ${SANDBOX_KEY}" \
+            -H "Content-Type: application/json" \
+            -d '{"source":"github-actions-sandbox"}' \
+            -o /dev/null)
+
+          if [ "$INSERT_CODE" != "201" ]; then
+            echo "::error::沙盒心跳 INSERT 失败 HTTP ${INSERT_CODE}"
+            echo "若为 404：沙盒库还没有 keep_alive_pings 表，请在能连上 Supabase 的网络里登录后台执行 database/migration-v5-keepalive.sql"
+            exit 1
+          fi
+          echo "✅ 沙盒 INSERT OK (HTTP 201) — 计时器已重置"
+
+          # 2) 清理 30 天前的旧心跳
+          CUTOFF=$(date -u -d "30 days ago" +%Y-%m-%d)
+          DELETE_CODE=$(curl -w "%{http_code}" \
+            --max-time 30 \
+            --retry 2 \
+            -X DELETE \
+            "${SUPA_URL}/rest/v1/keep_alive_pings?pinged_at=lt.${CUTOFF}" \
+            -H "apikey: ${SANDBOX_KEY}" \
+            -H "Authorization: Bearer ${SANDBOX_KEY}" \
+            -o /dev/null)
+          echo "✅ 沙盒 Cleanup done (HTTP ${DELETE_CODE})"
+        env:
+          SANDBOX_SUPABASE_URL: ${{ secrets.SANDBOX_SUPABASE_URL }}
+          SANDBOX_SUPABASE_ANON_KEY: ${{ secrets.SANDBOX_SUPABASE_ANON_KEY }}
