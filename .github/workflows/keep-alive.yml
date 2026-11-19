@@ -13,6 +13,9 @@ on:
     paths:
       - '.github/workflows/keep-alive.yml'
 
+permissions:
+  contents: write          # 沙盒心跳结果写回 dev-logs/sandbox-ping.log，便于本地核对
+
 jobs:
   ping:
     runs-on: ubuntu-latest
@@ -73,6 +76,8 @@ jobs:
     name: 保活沙盒演示库（party-station-demo）
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       - name: INSERT heartbeat into sandbox keep_alive_pings
         run: |
           set -euo pipefail
@@ -98,9 +103,9 @@ jobs:
           if [ "$INSERT_CODE" != "201" ]; then
             echo "::error::沙盒心跳 INSERT 失败 HTTP ${INSERT_CODE}"
             echo "若为 404：沙盒库还没有 keep_alive_pings 表，请在能连上 Supabase 的网络里登录后台执行 database/migration-v5-keepalive.sql"
-            exit 1
+          else
+            echo "✅ 沙盒 INSERT OK (HTTP 201) — 计时器已重置"
           fi
-          echo "✅ 沙盒 INSERT OK (HTTP 201) — 计时器已重置"
 
           # 2) 清理 30 天前的旧心跳
           CUTOFF=$(date -u -d "30 days ago" +%Y-%m-%d)
@@ -113,6 +118,20 @@ jobs:
             -H "Authorization: Bearer ${SANDBOX_KEY}" \
             -o /dev/null)
           echo "✅ 沙盒 Cleanup done (HTTP ${DELETE_CODE})"
+
+          # 结果传给“记录”步骤（GITHUB_ENV 跨步骤传递）
+          echo "INSERT_CODE=${INSERT_CODE}" >> "$GITHUB_ENV"
+          echo "DELETE_CODE=${DELETE_CODE}" >> "$GITHUB_ENV"
         env:
           SANDBOX_SUPABASE_URL: ${{ secrets.SANDBOX_SUPABASE_URL }}
           SANDBOX_SUPABASE_ANON_KEY: ${{ secrets.SANDBOX_SUPABASE_ANON_KEY }}
+
+      - name: 记录心跳结果到仓库（便于无网页环境核对）
+        run: |
+          mkdir -p dev-logs
+          echo "$(date -u +%Y-%m-%dT%H:%MZ) INSERT=${INSERT_CODE} CLEANUP=${DELETE_CODE}" >> dev-logs/sandbox-ping.log
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add dev-logs/sandbox-ping.log
+          git commit -m "sandbox keep-alive ping [skip ci]" || echo "无变化，跳过提交"
+          git push || echo "回写失败（不影响心跳本身）"
